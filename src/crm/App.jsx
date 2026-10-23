@@ -1,15 +1,43 @@
 import { useState } from "react";
 import { CRMProvider, useCRM } from "./store";
 import { Sidebar, Topbar, Toasts } from "./Layout";
+
+// Tax Invoices (Untouched & Preserved)
 import { InvoiceDetails, InvoiceForm, InvoiceRegister, ProjectWorkspace, TaxInvoices } from "./pages/Invoices";
-import { QuotationForm, QuotationView, Quotations } from "./pages/Quotations";
-import { LeadDetails, Leads } from "./pages/Leads";
-import { Dashboard, Employees, Inventory, Settings } from "./pages/Other";
+
+// Inventory, Dashboard & Settings (Untouched & Preserved)
+import { Dashboard, Inventory, Settings } from "./pages/Other";
+
+// Lead Module (Newly Copied & Enhanced for Skyarth)
+import { Leads } from "./pages/Leads";
+import { LeadDetails } from "./pages/LeadDetails";
+
+// Quotation Module (Newly Copied & Enhanced for Skyarth)
+import { Quotations } from "./pages/Quotations";
+import { QuotationEditor } from "./pages/QuotationEditor";
+
+// Employee Module (Newly Copied & Enhanced for Skyarth)
+import { Employees } from "./pages/Employees";
+import { EmployeeDetails } from "./pages/EmployeeDetails";
+import { EmployeeDocuments } from "./pages/EmployeeDocuments";
 
 const PAGES = {
-  dashboard: Dashboard, leads: Leads, lead: LeadDetails, quotations: Quotations, quotationForm: QuotationForm, quotation: QuotationView,
-  employees: Employees, inventory: Inventory, invoices: TaxInvoices, project: ProjectWorkspace, invoiceForm: InvoiceForm,
-  invoice: InvoiceDetails, register: InvoiceRegister, settings: Settings,
+  dashboard: Dashboard,
+  leads: Leads,
+  lead: LeadDetails,
+  quotations: Quotations,
+  quotationForm: QuotationEditor,
+  quotation: QuotationEditor,
+  employees: Employees,
+  employee: EmployeeDetails,
+  employeeDocuments: EmployeeDocuments,
+  inventory: Inventory,
+  invoices: TaxInvoices,
+  project: ProjectWorkspace,
+  invoiceForm: InvoiceForm,
+  invoice: InvoiceDetails,
+  register: InvoiceRegister,
+  settings: Settings,
 };
 
 function Shell() {
@@ -31,5 +59,9 @@ function Shell() {
 }
 
 export default function App() {
-  return <CRMProvider><Shell /></CRMProvider>;
+  return (
+    <CRMProvider>
+      <Shell />
+    </CRMProvider>
+  );
 }

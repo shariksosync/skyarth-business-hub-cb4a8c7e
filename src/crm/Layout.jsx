@@ -15,17 +15,19 @@ export const NAV = [
 
 export const SECTION_OF = {
   dashboard: "dashboard", leads: "leads", lead: "leads", quotations: "quotations", quotationForm: "quotations",
-  quotation: "quotations", employees: "employees", inventory: "inventory", invoices: "invoices", project: "invoices",
+  quotation: "quotations", employees: "employees", employee: "employees", employeeDocuments: "employees",
+  inventory: "inventory", invoices: "invoices", project: "invoices",
   invoiceForm: "invoices", invoice: "invoices", register: "invoices", settings: "settings",
 };
 
 const CRUMB = {
-  lead: "Lead Details", quotationForm: "Quotation Editor", quotation: "Quotation", project: "Project Workspace",
-  invoiceForm: "Invoice Editor", invoice: "Invoice Details", register: "Invoice Register",
+  lead: "Lead Details", quotationForm: "Quotation Editor", quotation: "Quotation Details",
+  employee: "Employee Profile", employeeDocuments: "KYC Documents",
+  project: "Project Workspace", invoiceForm: "Invoice Editor", invoice: "Invoice Details", register: "Invoice Register",
 };
 
 export function Sidebar({ open, onClose }) {
-  const { route, go, data } = useCRM();
+  const { route, go, data, resetData } = useCRM();
   const active = SECTION_OF[route.page];
   return (
     <>
@@ -41,7 +43,20 @@ export function Sidebar({ open, onClose }) {
             </button>
           ))}
         </nav>
-        <div className="border-t border-border p-4 text-xs">Demo data · resets on refresh</div>
+        <div className="border-t border-border p-3 space-y-2">
+          <button
+            onClick={() => {
+              if (window.confirm("Reset all CRM mock data back to factory defaults?")) {
+                resetData();
+                onClose();
+              }
+            }}
+            className="w-full text-xs font-semibold py-1.5 px-2.5 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-100 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            ↻ Reset Demo Data
+          </button>
+          <div className="text-[11px] text-neutral-400 text-center">Skyarth uPVC Windows CRM</div>
+        </div>
       </aside>
     </>
   );
@@ -72,7 +87,7 @@ export function Topbar({ onMenu }) {
       const p = data.projects.find((x) => x.id === i.projectId);
       matches(q, i.number, p?.name, p?.customerName) && r.push({ k: i.id, type: "Invoice", label: `${i.number} · ${p?.name}`, go: () => go("invoice", { id: i.id }) });
     });
-    data.employees.forEach((e) => matches(q, e.code, e.name, e.phone, e.email) && r.push({ k: e.id, type: "Employee", label: `${e.code} · ${e.name}`, go: () => go("employees", { view: e.id }) }));
+    data.employees.forEach((e) => matches(q, e.code, e.name, e.phone, e.email) && r.push({ k: e.id, type: "Employee", label: `${e.code} · ${e.name}`, go: () => go("employee", { id: e.id }) }));
     return r.slice(0, 12);
   }, [q, data, go]);
 

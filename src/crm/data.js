@@ -44,12 +44,12 @@ const settings = {
 };
 
 const employees = [
-  { id: "emp-1", code: "E-101", name: "Rahul Deshmukh", designation: "Sales Manager", department: "Sales", phone: "9822011001", email: "rahul.d@skyarthupvc.com", joiningDate: "2021-04-12", address: "Kharadi, Pune", status: "Active" },
-  { id: "emp-2", code: "E-102", name: "Sneha Kulkarni", designation: "Sales Executive", department: "Sales", phone: "9822011002", email: "sneha.k@skyarthupvc.com", joiningDate: "2022-07-01", address: "Viman Nagar, Pune", status: "Active" },
-  { id: "emp-3", code: "E-103", name: "Amit Joshi", designation: "Project Engineer", department: "Projects", phone: "9822011003", email: "amit.j@skyarthupvc.com", joiningDate: "2020-11-16", address: "Hadapsar, Pune", status: "Active" },
-  { id: "emp-4", code: "E-104", name: "Priya Shinde", designation: "Accounts Executive", department: "Accounts", phone: "9822011004", email: "priya.s@skyarthupvc.com", joiningDate: "2023-01-09", address: "Wagholi, Pune", status: "Active" },
-  { id: "emp-5", code: "E-105", name: "Vikram Pawar", designation: "Site Supervisor", department: "Installation", phone: "9822011005", email: "vikram.p@skyarthupvc.com", joiningDate: "2021-09-20", address: "Chandan Nagar, Pune", status: "Active" },
-  { id: "emp-6", code: "E-106", name: "Neha Gaikwad", designation: "Sales Executive", department: "Sales", phone: "9822011006", email: "neha.g@skyarthupvc.com", joiningDate: "2024-03-04", address: "Kalyani Nagar, Pune", status: "On Leave" },
+  { id: "emp-1", code: "E-101", name: "Rahul Deshmukh", designation: "Sales Manager", department: "Sales & Marketing", phone: "9822011001", altPhone: "9822099001", email: "rahul.d@skyarthupvc.com", joiningDate: "2021-04-12", address: "Kharadi, Pune", status: "Active", salary: 720000, employmentType: "Full Time", bankAccount: "5020008921101", ifsc: "HDFC0001234", emergencyName: "Pooja Deshmukh", emergencyContact: "9822099901" },
+  { id: "emp-2", code: "E-102", name: "Sneha Kulkarni", designation: "Senior Estimator", department: "Design & Estimating", phone: "9822011002", altPhone: "9822099002", email: "sneha.k@skyarthupvc.com", joiningDate: "2022-07-01", address: "Viman Nagar, Pune", status: "Active", salary: 540000, employmentType: "Full Time", bankAccount: "5020008921102", ifsc: "HDFC0001234", emergencyName: "Mahesh Kulkarni", emergencyContact: "9822099902" },
+  { id: "emp-3", code: "E-103", name: "Amit Joshi", designation: "Fabrication Supervisor", department: "Production & Fabrication", phone: "9822011003", altPhone: "9822099003", email: "amit.j@skyarthupvc.com", joiningDate: "2020-11-16", address: "Hadapsar, Pune", status: "Active", salary: 600000, employmentType: "Full Time", bankAccount: "5020008921103", ifsc: "HDFC0001234", emergencyName: "Kavita Joshi", emergencyContact: "9822099903" },
+  { id: "emp-4", code: "E-104", name: "Priya Shinde", designation: "Accounts Executive", department: "Accounts & Finance", phone: "9822011004", altPhone: "9822099004", email: "priya.s@skyarthupvc.com", joiningDate: "2023-01-09", address: "Wagholi, Pune", status: "Active", salary: 420000, employmentType: "Full Time", bankAccount: "5020008921104", ifsc: "HDFC0001234", emergencyName: "Sanjay Shinde", emergencyContact: "9822099904" },
+  { id: "emp-5", code: "E-105", name: "Vikram Pawar", designation: "Site Installation Supervisor", department: "Site Installation", phone: "9822011005", altPhone: "9822099005", email: "vikram.p@skyarthupvc.com", joiningDate: "2021-09-20", address: "Chandan Nagar, Pune", status: "Active", salary: 480000, employmentType: "Full Time", bankAccount: "5020008921105", ifsc: "HDFC0001234", emergencyName: "Sunita Pawar", emergencyContact: "9822099905" },
+  { id: "emp-6", code: "E-106", name: "Neha Gaikwad", designation: "Sales Executive", department: "Sales & Marketing", phone: "9822011006", altPhone: "9822099006", email: "neha.g@skyarthupvc.com", joiningDate: "2024-03-04", address: "Kalyani Nagar, Pune", status: "On Leave", salary: 380000, employmentType: "Full Time", bankAccount: "5020008921106", ifsc: "HDFC0001234", emergencyName: "Anand Gaikwad", emergencyContact: "9822099906" },
 ];
 
 const H = (id, date, text) => ({ id, date, text, type: "Note" });
@@ -211,4 +211,22 @@ const movements = [
   { id: "mv-4", itemId: "item-11", date: "2026-10-15", type: "Adjustment", qty: -2, projectId: "", reference: "AUD-03", notes: "Damaged boxes", balanceAfter: 8 },
 ];
 
-export const seed = { settings, employees, leads, quotations, projects, invoices, inventory, movements };
+const documents = [
+  { id: "doc-1", employeeId: "emp-1", name: "rahul-aadhaar-front.pdf", type: "Aadhaar Card", uploadedDate: "2026-04-12", status: "Verified", size: "245 KB" },
+  { id: "doc-2", employeeId: "emp-1", name: "rahul-pan-card.pdf", type: "PAN Card", uploadedDate: "2026-04-12", status: "Verified", size: "185 KB" },
+  { id: "doc-3", employeeId: "emp-1", name: "rahul-appointment-letter.pdf", type: "Offer / Appointment Letter", uploadedDate: "2021-04-10", status: "Verified", size: "320 KB" },
+  { id: "doc-4", employeeId: "emp-2", name: "sneha-aadhaar-card.pdf", type: "Aadhaar Card", uploadedDate: "2026-07-01", status: "Verified", size: "210 KB" },
+  { id: "doc-5", employeeId: "emp-2", name: "sneha-pan-card.pdf", type: "PAN Card", uploadedDate: "2026-07-01", status: "Verified", size: "190 KB" },
+  { id: "doc-6", employeeId: "emp-2", name: "sneha-nda-contract.pdf", type: "NDA Letter", uploadedDate: "2022-07-01", status: "Verified", size: "275 KB" },
+  { id: "doc-7", employeeId: "emp-3", name: "amit-aadhaar.pdf", type: "Aadhaar Card", uploadedDate: "2026-11-16", status: "Verified", size: "260 KB" },
+  { id: "doc-8", employeeId: "emp-3", name: "amit-fabrication-certificate.pdf", type: "Educational Certificate", uploadedDate: "2020-11-16", status: "Verified", size: "340 KB" },
+  { id: "doc-9", employeeId: "emp-4", name: "priya-aadhaar-card.pdf", type: "Aadhaar Card", uploadedDate: "2026-01-09", status: "Verified", size: "230 KB" },
+  { id: "doc-10", employeeId: "emp-4", name: "priya-pan-card.pdf", type: "PAN Card", uploadedDate: "2026-01-09", status: "Verified", size: "195 KB" },
+  { id: "doc-11", employeeId: "emp-5", name: "vikram-aadhaar-card.pdf", type: "Aadhaar Card", uploadedDate: "2026-09-20", status: "Verified", size: "215 KB" },
+  { id: "doc-12", employeeId: "emp-5", name: "vikram-installation-experience.pdf", type: "Experience Certificate", uploadedDate: "2021-09-20", status: "Pending", size: "410 KB" },
+  { id: "doc-13", employeeId: "emp-6", name: "neha-aadhaar-card.pdf", type: "Aadhaar Card", uploadedDate: "2026-03-04", status: "Verified", size: "225 KB" },
+  { id: "doc-14", employeeId: "emp-6", name: "neha-pan-card.pdf", type: "PAN Card", uploadedDate: "2026-03-04", status: "Pending", size: "180 KB" },
+];
+
+export const seed = { settings, employees, leads, quotations, projects, invoices, inventory, movements, documents };
+
