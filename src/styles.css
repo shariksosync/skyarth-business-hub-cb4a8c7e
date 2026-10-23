@@ -131,7 +131,6 @@
 @utility doc-box { border: 1px solid var(--foreground); padding: 0.5rem; }
 @utility doc-label { font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.06em; }
 @utility doc-kv { width: 100%; & td { padding: 1px 4px; } & td:nth-child(odd) { font-weight: 600; white-space: nowrap; } }
-@utility doc-kv-wide { }
 @utility doc-table {
   width: 100%; border-collapse: collapse; margin-bottom: 0.6rem;
   & th, & td { border: 1px solid var(--foreground); padding: 3px 5px; vertical-align: top; }
