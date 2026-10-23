@@ -95,7 +95,7 @@
 }
 @utility nav-active { border-color: var(--foreground); font-weight: 700; }
 @utility stat-card { padding: 1rem; transition: border-color 0.15s; &:hover { border-color: var(--foreground); } }
-@utility overlay { position: fixed; inset: 0; z-index: 50; background: oklch(0 0 0 / 0.3); display: flex; align-items: flex-start; justify-content: center; padding: 4vh 1rem; overflow-y: auto; }
+@utility overlay { position: fixed; inset: 0; z-index: 58; background: oklch(0 0 0 / 0.3); display: flex; align-items: flex-start; justify-content: center; padding: 4vh 1rem; overflow-y: auto; }
 @utility modal-panel { width: 100%; box-shadow: var(--shadow-panel-v); }
 @utility sidebar {
   position: fixed; inset: 0 auto 0 0; z-index: 55; width: 15rem; display: flex; flex-direction: column;
