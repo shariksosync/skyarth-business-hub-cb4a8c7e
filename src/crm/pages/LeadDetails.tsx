@@ -151,6 +151,7 @@ export function LeadDetails() {
       customerAddress: lead.billingAddress || lead.siteAddress || "",
       projectName: lead.projectName || `${lead.customerName} uPVC Project`,
       employeeId: lead.employeeId || "",
+      expectedCompletionDate: lead.expectedCompletionDate || "",
     });
   };
 
@@ -213,6 +214,12 @@ export function LeadDetails() {
                 Project: {lead.projectName} {lead.companyName ? `· ${lead.companyName}` : ""}
               </p>
             )}
+            {lead.expectedCompletionDate && (
+              <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-semibold">
+                <Calendar className="size-3.5 text-amber-600" />
+                <span>Expected Handover: <strong className="font-bold">{dateFmt(lead.expectedCompletionDate)}</strong></span>
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className="text-xs font-bold text-neutral-400 uppercase">Estimated Value</div>
@@ -256,6 +263,7 @@ export function LeadDetails() {
             <DetailRow label="Lead Source" value={lead.source} />
             <DetailRow label="Assigned Rep" value={empName(data, lead.employeeId)} />
             <DetailRow label="Next Follow-up" value={lead.followUpDate ? dateFmt(lead.followUpDate) : "—"} />
+            <DetailRow label="Exp. Project Completion" value={lead.expectedCompletionDate ? dateFmt(lead.expectedCompletionDate) : "—"} />
             <DetailRow label="Created On" value={dateFmt(lead.createdDate)} />
           </SectionCard>
 
@@ -539,6 +547,22 @@ export function LeadDetails() {
                 onChange={(e) => setEditModal({ ...editModal, requirements: e.target.value })}
               />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Next Follow-up Date">
+                <Input
+                  type="date"
+                  value={editModal.followUpDate || ""}
+                  onChange={(e) => setEditModal({ ...editModal, followUpDate: e.target.value })}
+                />
+              </Field>
+              <Field label="Expected Project Completion Date">
+                <Input
+                  type="date"
+                  value={editModal.expectedCompletionDate || ""}
+                  onChange={(e) => setEditModal({ ...editModal, expectedCompletionDate: e.target.value })}
+                />
+              </Field>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Status">
                 <Select

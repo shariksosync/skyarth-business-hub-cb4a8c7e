@@ -1,5 +1,31 @@
 import React, { forwardRef } from "react";
-import { inr, dateFmt, computeTotals, amountInWords, formatQuotationNumber } from "../utils/format";
+import { inr, dateFmt, formatQuotationNumber } from "../utils/format";
+
+export interface QuotationWindowItem {
+  id?: string;
+  windowCode?: string;
+  location?: string;
+  widthMm?: number | string;
+  heightMm?: number | string;
+  areaSqft?: number | string;
+  qty?: number;
+  totalAreaSqft?: number | string;
+  rate?: number;
+  valueEach?: number | string;
+  totalValue?: number | string;
+  glassThickness?: string | number;
+  glassSpec?: string;
+  lockingType?: string;
+  designSpecs?: string;
+
+  // Legacy fallback support
+  name?: string;
+  description?: string;
+  dimensions?: string;
+  unit?: string;
+  discount?: number;
+  taxRate?: number;
+}
 
 export interface QuotationPrintTemplateProps {
   quotation: any;
@@ -10,261 +36,306 @@ export const QuotationPrintTemplate = forwardRef<HTMLDivElement, QuotationPrintT
   ({ quotation, className = "" }, ref) => {
     if (!quotation) return null;
 
-    const items = quotation.items || [];
-    const totals = computeTotals(
-      items.map((i: any) => ({
-        qty: Number(i.qty) || 0,
-        rate: Number(i.rate) || 0,
-        discount: Number(i.discount) || 0,
-        taxRate: Number(i.tax || i.taxRate) || 18,
-      })),
-      true
-    );
+    const rawItems: any[] = quotation.items || [];
+
+    // Normalize items into window schedule format
+    const items: QuotationWindowItem[] = rawItems.map((item, idx) => {
+      const windowCode = item.windowCode || item.code || `W${idx + 1}`;
+      const location = item.location || item.name || "WINDOW";
+      const widthMm = Number(item.widthMm) || (item.dimensions ? parseDimension(item.dimensions, "w") : 1200);
+      const heightMm = Number(item.heightMm) || (item.dimensions ? parseDimension(item.dimensions, "h") : 1200);
+      
+      const qty = Number(item.qty) || 1;
+      const rate = Number(item.rate) || 480;
+
+      // Area in sq.ft: either stored or computed from mm (1 m2 = 10.7639 sq.ft -> mm*mm / 92903.04)
+      const computedArea = widthMm && heightMm ? Number(((widthMm * heightMm) / 92903.04).toFixed(2)) : 10;
+      const areaSqft = item.areaSqft !== undefined && item.areaSqft !== "" ? Number(item.areaSqft) : computedArea;
+      const totalAreaSqft = item.totalAreaSqft !== undefined && item.totalAreaSqft !== "" 
+        ? Number(item.totalAreaSqft) 
+        : Number((areaSqft * qty).toFixed(2));
+
+      const valueEach = item.valueEach !== undefined && item.valueEach !== ""
+        ? Number(item.valueEach)
+        : Number((areaSqft * rate).toFixed(2));
+
+      const totalValue = item.totalValue !== undefined && item.totalValue !== ""
+        ? Number(item.totalValue)
+        : Number((totalAreaSqft * rate).toFixed(2));
+
+      const glassThickness = item.glassThickness || "5";
+      const glassSpec = item.glassSpec || "CLEAR GLASS";
+      const lockingType = item.lockingType || "TOUCHLOCK";
+      const designSpecs = item.designSpecs || item.description || "3 TRACK 2 GLASS 1 MESH (99MM SECTION)";
+
+      return {
+        id: item.id || `item-${idx}`,
+        windowCode,
+        location,
+        widthMm,
+        heightMm,
+        areaSqft,
+        qty,
+        totalAreaSqft,
+        rate,
+        valueEach,
+        totalValue,
+        glassThickness,
+        glassSpec,
+        lockingType,
+        designSpecs,
+      };
+    });
+
+    // Summary totals
+    const totalUnits = items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0);
+    const totalAreaSqft = Number(items.reduce((sum, i) => sum + (Number(i.totalAreaSqft) || 0), 0).toFixed(2));
+    const totalWindowValue = Number(items.reduce((sum, i) => sum + (Number(i.totalValue) || 0), 0).toFixed(2));
+
+    const avgRatePerSqft = totalAreaSqft > 0 ? Math.round(totalWindowValue / totalAreaSqft) : 0;
+
+    const installRate = quotation.installationRatePerSqft !== undefined ? Number(quotation.installationRatePerSqft) : 30;
+    const installationCharges = quotation.installationCharges !== undefined && quotation.installationCharges !== ""
+      ? Number(quotation.installationCharges)
+      : Number((installRate * totalAreaSqft).toFixed(2));
+
+    const transportCharges = quotation.transportCharges !== undefined && quotation.transportCharges !== ""
+      ? Number(quotation.transportCharges)
+      : 2500.0;
+
+    const totalProjectValue = Number((totalWindowValue + installationCharges + transportCharges).toFixed(2));
+    const gstRate = quotation.taxRate !== undefined ? Number(quotation.taxRate) : 18;
+    const gstAmount = Number(((totalProjectValue * gstRate) / 100).toFixed(2));
+    const grandTotal = Number((totalProjectValue + gstAmount).toFixed(2));
 
     return (
       <div
         ref={ref}
+        data-orientation="landscape"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
-        className={`print-area p-6 sm:p-8 bg-white border border-neutral-300 shadow-lg font-sans text-neutral-900 w-full max-w-[840px] mx-auto box-border print:border-none print:shadow-none print:p-0 print:max-w-full print:!bg-white ${className}`}
+        className={`print-area orientation-landscape w-full max-w-[1100px] mx-auto bg-white p-5 sm:p-7 text-neutral-900 font-sans border border-neutral-300 shadow-md box-border print:border-none print:shadow-none print:p-0 print:max-w-full print:!bg-white ${className}`}
       >
-        {/* Header */}
-        <div className="flex flex-row justify-between items-start gap-4 pb-4 border-b-2 border-neutral-800">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3.5">
-              <div className="size-16 shrink-0 rounded-xl bg-black text-white flex items-center justify-center font-extrabold text-2xl tracking-tighter">
-                SKY
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-950 uppercase leading-none">
-                  SKYARTH uPVC Windows LLP
-                </h1>
-                <p className="text-[11px] font-bold tracking-wider text-neutral-600 uppercase mt-1">
-                  Architectural uPVC Doors, Windows & Sliding Systems
-                </p>
-              </div>
+        {/* Top Header */}
+        <div className="flex items-center justify-between pb-3">
+          <div className="w-24"></div>
+          <div className="border border-neutral-950 px-8 py-1.5 bg-neutral-50/50 shadow-sm text-center">
+            <h1 className="text-base sm:text-lg font-black tracking-widest text-neutral-950 uppercase">
+              SKYARTH UPVC WINDOWS LLP.
+            </h1>
+          </div>
+          <div className="w-28 text-right">
+            <div className="text-lg font-black tracking-wider text-neutral-900 inline-block font-sans">
+              <span className="text-amber-600 font-extrabold">SKY</span>ARTH
             </div>
+          </div>
+        </div>
 
-            <div className="mt-3 text-[11px] leading-relaxed text-neutral-700">
-              <p className="font-semibold text-neutral-900">Office No. 113, Tower B, City Vista, Kharadi, Pune - 411014</p>
-              <p>
-                <span className="font-semibold text-neutral-900">Email:</span> support@skyarthupvc.com &nbsp;|&nbsp;
-                <span className="font-semibold text-neutral-900"> Phone:</span> +91 99456 78901
-              </p>
-              <p>
-                <span className="font-semibold text-neutral-900">GSTIN:</span> 27AAHFS8921C1Z4 &nbsp;|&nbsp;
-                <span className="font-semibold text-neutral-900"> State:</span> Maharashtra (Code: 27)
-              </p>
+        {/* Client & Date Metadata Boxes */}
+        <div className="mt-2.5 grid grid-cols-12 gap-3 text-[11px]">
+          {/* Client Details Box (Left) */}
+          <div className="col-span-8 border border-neutral-950 divide-y divide-neutral-950 bg-white">
+            <div className="grid grid-cols-[90px_1fr] p-1.5">
+              <span className="font-bold text-neutral-900 uppercase">CLIENT</span>
+              <span className="font-semibold text-neutral-950">{quotation.customerName || "Mr. Mahesh Chawla Sir"}</span>
+            </div>
+            <div className="grid grid-cols-[90px_1fr] p-1.5">
+              <span className="font-bold text-neutral-900 uppercase">PROJECT</span>
+              <span className="font-semibold text-neutral-800">{quotation.projectName || quotation.siteAddress || "PUNE"}</span>
+            </div>
+            <div className="grid grid-cols-[90px_1fr] p-1.5">
+              <span className="font-bold text-neutral-900 uppercase">SUBJECT</span>
+              <span className="font-semibold text-neutral-800">
+                {quotation.subject || "Delivery Of uPVC DOORS & WINDOWS"}
+              </span>
             </div>
           </div>
 
-          <div className="w-[230px] shrink-0 flex flex-col items-end">
-            <div className="bg-black text-white px-3 py-1 font-black text-base tracking-widest uppercase rounded-sm">
-              QUOTATION
+          {/* Date & Quote No Box (Right) */}
+          <div className="col-span-4 border border-neutral-950 divide-y divide-neutral-950 bg-white flex flex-col justify-start">
+            <div className="grid grid-cols-[65px_1fr] p-1.5">
+              <span className="font-bold text-neutral-900 uppercase">Date</span>
+              <span className="font-bold text-neutral-950 text-right">{dateFmt(quotation.date)}</span>
             </div>
-
-            <div className="mt-3 border border-neutral-300 rounded text-[11px] w-full bg-neutral-50/60 overflow-hidden">
-              <div className="grid grid-cols-[85px_1fr] border-b border-neutral-200">
-                <span className="bg-neutral-100 p-1.5 font-bold text-neutral-700 uppercase border-r border-neutral-200">
-                  Date:
-                </span>
-                <span className="p-1.5 font-semibold text-neutral-900 text-center">
-                  {dateFmt(quotation.date)}
-                </span>
-              </div>
-              <div className="grid grid-cols-[85px_1fr] border-b border-neutral-200">
-                <span className="bg-neutral-100 p-1.5 font-bold text-neutral-700 uppercase border-r border-neutral-200">
-                  Quote No:
-                </span>
-                <span className="p-1.5 font-bold text-neutral-950 text-center">
+            {quotation.number && (
+              <div className="grid grid-cols-[65px_1fr] p-1.5">
+                <span className="font-bold text-neutral-900 uppercase text-[10px]">Quote #</span>
+                <span className="font-mono font-bold text-neutral-950 text-right text-[10.5px]">
                   {formatQuotationNumber(quotation.number)}
                 </span>
               </div>
-              <div className="grid grid-cols-[85px_1fr]">
-                <span className="bg-neutral-100 p-1.5 font-bold text-neutral-700 uppercase border-r border-neutral-200">
-                  Valid Until:
-                </span>
-                <span className="p-1.5 font-medium text-neutral-800 text-center">
-                  {dateFmt(quotation.validUntil)}
-                </span>
+            )}
+            {quotation.validUntil && (
+              <div className="grid grid-cols-[65px_1fr] p-1.5 text-neutral-600">
+                <span className="font-semibold uppercase text-[10px]">Valid</span>
+                <span className="font-medium text-right text-[10px]">{dateFmt(quotation.validUntil)}</span>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Client & Site Details */}
-        <div className="mt-4 grid grid-cols-2 gap-3 text-[11px]">
-          <div className="border border-neutral-300 rounded p-2.5 bg-neutral-50/40">
-            <h3 className="font-bold uppercase tracking-wider text-neutral-700 border-b border-neutral-200 pb-1 mb-1.5">
-              Customer / Billing Details
-            </h3>
-            <p className="font-bold text-sm text-neutral-950">{quotation.customerName || "Customer Name"}</p>
-            {quotation.projectName && (
-              <p className="font-semibold text-neutral-800 mt-0.5">Project: {quotation.projectName}</p>
-            )}
-            {quotation.customerCompany && (
-              <p className="text-neutral-600">{quotation.customerCompany}</p>
-            )}
-            <p className="text-neutral-700 mt-1">{quotation.billingAddress || quotation.customerAddress || "Address on record"}</p>
-            <p className="mt-1">
-              <span className="font-semibold">Phone:</span> {quotation.customerPhone || quotation.phone || "—"}
-              {quotation.customerEmail && (
-                <> &nbsp;|&nbsp; <span className="font-semibold">Email:</span> {quotation.customerEmail}</>
-              )}
-            </p>
-            {quotation.customerGstin && (
-              <p className="font-semibold">GSTIN: {quotation.customerGstin}</p>
-            )}
-          </div>
-
-          <div className="border border-neutral-300 rounded p-2.5 bg-neutral-50/40">
-            <h3 className="font-bold uppercase tracking-wider text-neutral-700 border-b border-neutral-200 pb-1 mb-1.5">
-              Site & Execution Details
-            </h3>
-            <p className="font-semibold text-neutral-900">
-              Site Location: <span className="font-normal">{quotation.siteAddress || quotation.billingAddress || "As per order"}</span>
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold">Prepared By:</span> {quotation.employeeName || "Skyarth Sales & Technical Team"}
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold">Profile System:</span> Premium Multi-Chamber uPVC (Reinforced)
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold">Glass Spec:</span> Toughened / Insulated Clear Glass (Saint-Gobain standard)
-            </p>
-            <p className="mt-1">
-              <span className="font-semibold">Hardware:</span> Heavy-Duty Multipoint Locking & SS Hardware
-            </p>
-          </div>
-        </div>
-
-        {/* Specifications Table */}
-        <div className="mt-4 border border-neutral-800 rounded overflow-hidden">
-          <table className="w-full text-[11px] text-left border-collapse">
+        {/* 14-Column Architectural Window Schedule Table */}
+        <div className="mt-3.5 border border-neutral-950 overflow-x-auto">
+          <table className="w-full text-[10px] text-left border-collapse min-w-[980px]">
             <thead>
-              <tr className="bg-black text-white uppercase font-bold text-[10px] tracking-wider">
-                <th className="p-2 w-8 text-center border-r border-neutral-700">#</th>
-                <th className="p-2 border-r border-neutral-700">Description & Specification</th>
-                <th className="p-2 w-28 border-r border-neutral-700">Dimensions / Type</th>
-                <th className="p-2 w-14 text-center border-r border-neutral-700">Qty</th>
-                <th className="p-2 w-14 text-center border-r border-neutral-700">Unit</th>
-                <th className="p-2 w-20 text-right border-r border-neutral-700">Rate (₹)</th>
-                <th className="p-2 w-16 text-center border-r border-neutral-700">Disc %</th>
-                <th className="p-2 w-24 text-right">Amount (₹)</th>
+              <tr className="bg-neutral-100 text-neutral-950 font-bold uppercase text-[9.5px] border-b border-neutral-950 tracking-tight text-center">
+                <th className="p-1.5 border-r border-neutral-950 w-9">S. No.</th>
+                <th className="p-1.5 border-r border-neutral-950 w-16">Code of Window</th>
+                <th className="p-1.5 border-r border-neutral-950 text-left px-2 w-28">Location of Window</th>
+                <th className="p-1.5 border-r border-neutral-950 w-16">Width in (MM)</th>
+                <th className="p-1.5 border-r border-neutral-950 w-16">Height in (MM)</th>
+                <th className="p-1.5 border-r border-neutral-950 w-20 leading-tight">Area per Window (sqft)</th>
+                <th className="p-1.5 border-r border-neutral-950 w-12 leading-tight">Unit No.</th>
+                <th className="p-1.5 border-r border-neutral-950 w-20 leading-tight">Total Area (sqft)</th>
+                <th className="p-1.5 border-r border-neutral-950 w-24 text-right pr-2 leading-tight">Value of Each Window</th>
+                <th className="p-1.5 border-r border-neutral-950 w-24 text-right pr-2 leading-tight">Total Value in INR</th>
+                <th className="p-1.5 border-r border-neutral-950 w-16 text-right pr-1.5 leading-tight">Rate per sqft</th>
+                <th className="p-1.5 border-r border-neutral-950 w-12 leading-tight">Glass (in mm)</th>
+                <th className="p-1.5 border-r border-neutral-950 text-left px-1.5 w-24">Glass Specs</th>
+                <th className="p-1.5 border-r border-neutral-950 text-left px-1.5 w-24">LOCKING TYPE</th>
+                <th className="p-1.5 text-left px-2">DESIGN SPECIFICATIONS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200">
-              {items.map((item: any, idx: number) => {
-                const qty = Number(item.qty) || 0;
-                const rate = Number(item.rate) || 0;
-                const disc = Number(item.discount) || 0;
-                const base = qty * rate;
-                const lineTotal = base - (base * disc) / 100;
-                return (
-                  <tr key={idx} className={idx % 2 === 1 ? "bg-neutral-50/50" : ""}>
-                    <td className="p-2 text-center font-bold text-neutral-600 border-r border-neutral-200">{idx + 1}</td>
-                    <td className="p-2 border-r border-neutral-200 font-medium">
-                      <div className="font-bold text-neutral-900">{item.name || item.category || "uPVC Window System"}</div>
-                      <div className="text-[10px] text-neutral-600 mt-0.5 whitespace-pre-wrap">{item.description}</div>
-                    </td>
-                    <td className="p-2 border-r border-neutral-200 text-neutral-700 text-[10.5px]">
-                      {item.dimensions || item.type || "Custom Size"}
-                    </td>
-                    <td className="p-2 text-center font-bold text-neutral-900 border-r border-neutral-200">{qty}</td>
-                    <td className="p-2 text-center text-neutral-600 border-r border-neutral-200">{item.unit || "Sq.ft"}</td>
-                    <td className="p-2 text-right font-semibold text-neutral-800 border-r border-neutral-200">
-                      {inr(rate).replace("₹", "")}
-                    </td>
-                    <td className="p-2 text-center text-neutral-600 border-r border-neutral-200">
-                      {disc > 0 ? `${disc}%` : "—"}
-                    </td>
-                    <td className="p-2 text-right font-bold text-neutral-950">
-                      {inr(lineTotal).replace("₹", "")}
-                    </td>
-                  </tr>
-                );
-              })}
+            <tbody className="divide-y divide-neutral-950">
+              {items.map((it, idx) => (
+                <tr key={it.id || idx} className="hover:bg-neutral-50/50">
+                  <td className="p-1 text-center font-bold text-neutral-800 border-r border-neutral-950">{idx + 1}</td>
+                  <td className="p-1 text-center font-mono font-bold text-neutral-900 border-r border-neutral-950">
+                    {it.windowCode}
+                  </td>
+                  <td className="p-1 px-2 font-bold text-neutral-900 uppercase border-r border-neutral-950">
+                    {it.location}
+                  </td>
+                  <td className="p-1 text-center font-semibold text-neutral-800 border-r border-neutral-950">
+                    {it.widthMm}
+                  </td>
+                  <td className="p-1 text-center font-semibold text-neutral-800 border-r border-neutral-950">
+                    {it.heightMm}
+                  </td>
+                  <td className="p-1 text-center font-bold text-neutral-900 border-r border-neutral-950">
+                    {Number(it.areaSqft).toFixed(2)}
+                  </td>
+                  <td className="p-1 text-center font-extrabold text-neutral-950 border-r border-neutral-950">
+                    {it.qty}
+                  </td>
+                  <td className="p-1 text-center font-bold text-neutral-900 border-r border-neutral-950">
+                    {Number(it.totalAreaSqft).toFixed(2)}
+                  </td>
+                  <td className="p-1 text-right pr-2 font-semibold text-neutral-900 border-r border-neutral-950 font-mono">
+                    {Number(it.valueEach).toFixed(2)}
+                  </td>
+                  <td className="p-1 text-right pr-2 font-bold text-neutral-950 border-r border-neutral-950 font-mono">
+                    {Number(it.totalValue).toFixed(2)}
+                  </td>
+                  <td className="p-1 text-right pr-1.5 font-bold text-neutral-900 border-r border-neutral-950 font-mono">
+                    {it.rate}
+                  </td>
+                  <td className="p-1 text-center font-semibold text-neutral-800 border-r border-neutral-950">
+                    {it.glassThickness}
+                  </td>
+                  <td className="p-1 px-1.5 font-semibold text-neutral-800 uppercase border-r border-neutral-950 text-[9px] leading-tight">
+                    {it.glassSpec}
+                  </td>
+                  <td className="p-1 px-1.5 font-semibold text-neutral-800 uppercase border-r border-neutral-950 text-[9px] leading-tight">
+                    {it.lockingType}
+                  </td>
+                  <td className="p-1 px-2 font-semibold text-neutral-900 uppercase text-[9px] leading-tight">
+                    {it.designSpecs}
+                  </td>
+                </tr>
+              ))}
             </tbody>
+            {/* Table Totals Row */}
+            <tfoot>
+              <tr className="bg-neutral-100 font-black border-t-2 border-neutral-950 text-neutral-950 text-[10px]">
+                <td colSpan={6} className="p-1.5 text-right pr-3 border-r border-neutral-950 uppercase font-black">
+                  Total
+                </td>
+                <td className="p-1.5 text-center font-black border-r border-neutral-950">
+                  {totalUnits}
+                </td>
+                <td className="p-1.5 text-center font-black border-r border-neutral-950">
+                  {totalAreaSqft.toFixed(2)}
+                </td>
+                <td className="p-1.5 border-r border-neutral-950"></td>
+                <td className="p-1.5 text-right pr-2 font-mono font-black border-r border-neutral-950">
+                  {totalWindowValue.toFixed(2)}
+                </td>
+                <td colSpan={5} className="p-1.5 bg-neutral-100"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
-        {/* Financial Totals & Words */}
-        <div className="mt-3.5 grid grid-cols-2 gap-4 items-start text-[11px]">
-          <div>
-            <div className="border border-neutral-300 rounded p-2.5 bg-neutral-50/30">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider text-neutral-600">Amount in Words:</p>
-              <p className="text-xs font-extrabold text-neutral-900 mt-1 leading-snug">
-                {amountInWords(totals.total)}
+        {/* 3-Box Bottom Section: Specifications, Financial Summary, Contact */}
+        <div className="mt-3.5 grid grid-cols-12 gap-3 items-start text-[10.5px]">
+          {/* Box 1: Technical & Commercial Specifications (Left) */}
+          <div className="col-span-4 border border-neutral-950 p-2.5 bg-white space-y-1 text-neutral-900 leading-snug">
+            <p><span className="font-bold">Product</span> - {quotation.productBrand || "Fenstech"}</p>
+            <p><span className="font-bold">Window colour</span> - {quotation.windowColour || "White"}</p>
+            <p className="font-semibold">{quotation.deliveryDays || "Delivery with in 30 days"}</p>
+            <p className="text-neutral-700 italic">Quotation can be change after final measurements</p>
+            <p><span className="font-bold">Mesh Type</span> - {quotation.meshType || "Nylon"}</p>
+            <p><span className="font-bold">Payment</span> - {quotation.paymentTerms || "100% Advance"}</p>
+            <p className="font-semibold text-neutral-950">{quotation.hardwareBrand || "Windseal / DNV Imported hardware"}</p>
+            <p className="text-[9.5px] text-neutral-700 pt-0.5 border-t border-neutral-200 mt-1">
+              Sticker Removing & Cleaning of Windows & Goods Charges will be Extra
+            </p>
+          </div>
+
+          {/* Box 2: Summary Financial Calculation (Middle) */}
+          <div className="col-span-4 border border-neutral-950 bg-white overflow-hidden">
+            <div className="bg-neutral-100 border-b border-neutral-950 text-center py-1 font-bold text-[10px] tracking-wider uppercase text-neutral-950">
+              SUMMARY
+            </div>
+            <div className="divide-y divide-neutral-300 text-[10.5px]">
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">Total No. Of Windows / Doors</span>
+                <span className="font-bold text-neutral-950">{totalUnits}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">Total value</span>
+                <span className="font-mono font-bold text-neutral-950">{totalWindowValue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">Per Sqft rate</span>
+                <span className="font-mono font-bold text-neutral-950">{avgRatePerSqft}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">
+                  Installation Charges <span className="font-mono text-[9.5px] text-neutral-500">({installRate})</span>
+                </span>
+                <span className="font-mono font-semibold text-neutral-950">{installationCharges.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">Transport</span>
+                <span className="font-mono font-semibold text-neutral-950">{transportCharges.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1 bg-neutral-50 font-bold border-t border-neutral-950">
+                <span>Total project value</span>
+                <span className="font-mono">{totalProjectValue.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1">
+                <span className="font-medium text-neutral-800">GST 18%</span>
+                <span className="font-mono font-semibold text-neutral-950">{gstAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-2.5 py-1.5 bg-neutral-950 text-white font-black text-xs">
+                <span>Grand Total</span>
+                <span className="font-mono">{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Box 3: Representative & Site Office (Right) */}
+          <div className="col-span-4 border border-neutral-950 p-3 bg-white flex flex-col justify-between h-[190px]">
+            <div>
+              <p className="font-bold text-neutral-950 text-xs">{quotation.representativeName || "Mr. Swapnil Pawar"}</p>
+              <p className="text-[10px] text-neutral-600 mt-1 leading-relaxed">
+                {quotation.representativeAddress || "Gat NO.226, BAIF Road, Manjari Khurd, Satav wasti, Pune 412307"}
               </p>
             </div>
-
-            {/* Bank Remittance Details */}
-            <div className="mt-2.5 border border-neutral-300 rounded p-2.5 bg-neutral-50/30 text-[10.5px]">
-              <p className="font-bold uppercase tracking-wider text-neutral-700 mb-1">Bank Remittance Details:</p>
-              <p><span className="font-semibold">Bank Name:</span> HDFC Bank Ltd</p>
-              <p><span className="font-semibold">Account Name:</span> SKYARTH UPVC WINDOWS LLP</p>
-              <p><span className="font-semibold">Account No:</span> 50200089211045</p>
-              <p><span className="font-semibold">IFSC Code:</span> HDFC0001822 (Kharadi Branch, Pune)</p>
-            </div>
-          </div>
-
-          <div className="border border-neutral-300 rounded overflow-hidden text-[11px]">
-            <div className="flex justify-between p-2 border-b border-neutral-200">
-              <span className="text-neutral-600 font-medium">Subtotal (Gross):</span>
-              <span className="font-semibold">{inr(totals.subtotal)}</span>
-            </div>
-            {totals.totalDiscount > 0 && (
-              <div className="flex justify-between p-2 border-b border-neutral-200 text-rose-700">
-                <span>Special Discount:</span>
-                <span className="font-semibold">- {inr(totals.totalDiscount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between p-2 border-b border-neutral-200 bg-neutral-50 font-semibold">
-              <span>Taxable Value:</span>
-              <span>{inr(totals.taxable)}</span>
-            </div>
-            <div className="flex justify-between p-2 border-b border-neutral-200">
-              <span className="text-neutral-600">CGST (9%):</span>
-              <span>{inr(totals.cgst)}</span>
-            </div>
-            <div className="flex justify-between p-2 border-b border-neutral-200">
-              <span className="text-neutral-600">SGST (9%):</span>
-              <span>{inr(totals.sgst)}</span>
-            </div>
-            {totals.roundOff !== 0 && (
-              <div className="flex justify-between p-2 border-b border-neutral-200 text-neutral-500 text-[10px]">
-                <span>Round off:</span>
-                <span>{totals.roundOff > 0 ? `+${totals.roundOff}` : totals.roundOff}</span>
-              </div>
-            )}
-            <div className="flex justify-between p-2.5 bg-black text-white font-extrabold text-sm">
-              <span>Grand Total (Net Payable):</span>
-              <span>{inr(totals.total)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Commercial Terms & Signatures */}
-        <div className="mt-4 pt-3 border-t border-neutral-300 grid grid-cols-2 gap-4 text-[10.5px] leading-relaxed">
-          <div>
-            <h4 className="font-bold uppercase tracking-wider text-neutral-800 mb-1">Terms & Conditions:</h4>
-            <ul className="list-disc pl-4 space-y-0.5 text-neutral-600">
-              <li>Prices valid for 30 days from quotation date.</li>
-              <li>Payment: 50% Advance with confirmation, 40% on dispatch, 10% post-installation.</li>
-              <li>Warranty: 10 Years on uPVC profiles against fading/cracking; 1 Year on moving hardware.</li>
-              <li>Delivery timeframe: 15–21 working days post final site measurement confirmation.</li>
-              <li>Civil masonry modifications, scaffolding, and electrical connections at client's scope.</li>
-            </ul>
-          </div>
-
-          <div className="flex flex-col justify-between items-end text-right">
-            <div>
-              <p className="font-bold text-neutral-900 uppercase">For SKYARTH uPVC Windows LLP</p>
-              <p className="text-[10px] text-neutral-500">Authorized Signatory</p>
-            </div>
-            <div className="pt-10">
-              <div className="w-48 border-b border-neutral-800 mb-1"></div>
-              <p className="text-[10px] text-neutral-500">Technical Sales / Authorised Signatory</p>
+            <div className="pt-4 border-t border-dashed border-neutral-300 text-right">
+              <p className="text-[9.5px] font-bold text-neutral-950 uppercase">Authorized Signature</p>
+              <p className="text-[9px] text-neutral-500">SKYARTH UPVC WINDOWS LLP</p>
             </div>
           </div>
         </div>
@@ -274,3 +345,13 @@ export const QuotationPrintTemplate = forwardRef<HTMLDivElement, QuotationPrintT
 );
 
 QuotationPrintTemplate.displayName = "QuotationPrintTemplate";
+
+function parseDimension(dim: string, axis: "w" | "h"): number {
+  if (!dim) return 1200;
+  const match = dim.match(/(\d+)\s*(?:x|X|\*)\s*(\d+)/);
+  if (match) {
+    const val = axis === "w" ? match[1] : match[2];
+    return Number(val) || 1200;
+  }
+  return 1200;
+}

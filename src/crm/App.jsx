@@ -2,11 +2,23 @@ import { useState } from "react";
 import { CRMProvider, useCRM } from "./store";
 import { Sidebar, Topbar, Toasts } from "./Layout";
 
-// Tax Invoices (Untouched & Preserved)
-import { InvoiceDetails, InvoiceForm, InvoiceRegister, ProjectWorkspace, TaxInvoices } from "./pages/Invoices";
+// Tax Invoices, Receipts & Ledger
+import {
+  InvoiceDetails,
+  InvoiceForm,
+  InvoiceRegister,
+  PartyLedger,
+  PaymentReceiptsRegister,
+  ProjectWorkspace,
+  ReceiptDetails,
+  TaxInvoices,
+} from "./pages/Invoices";
 
-// Inventory, Dashboard & Settings (Untouched & Preserved)
-import { Dashboard, Inventory, Settings } from "./pages/Other";
+// Dashboard & Settings
+import { Dashboard, Settings } from "./pages/Other";
+
+// Inventory Module & Register (Enhanced for Skyarth)
+import { Inventory } from "./pages/Inventory";
 
 // Lead Module (Newly Copied & Enhanced for Skyarth)
 import { Leads } from "./pages/Leads";
@@ -15,6 +27,10 @@ import { LeadDetails } from "./pages/LeadDetails";
 // Quotation Module (Newly Copied & Enhanced for Skyarth)
 import { Quotations } from "./pages/Quotations";
 import { QuotationEditor } from "./pages/QuotationEditor";
+
+// Running Projects & Work Orders (Stage-wise & Phase-wise Execution Hub)
+import { RunningProjects } from "./pages/RunningProjects";
+import { RunningProjectDetails } from "./pages/RunningProjectDetails";
 
 // Employee Module (Newly Copied & Enhanced for Skyarth)
 import { Employees } from "./pages/Employees";
@@ -28,6 +44,8 @@ const PAGES = {
   quotations: Quotations,
   quotationForm: QuotationEditor,
   quotation: QuotationEditor,
+  projects: RunningProjects,
+  projectDetails: RunningProjectDetails,
   employees: Employees,
   employee: EmployeeDetails,
   employeeDocuments: EmployeeDocuments,
@@ -37,6 +55,9 @@ const PAGES = {
   invoiceForm: InvoiceForm,
   invoice: InvoiceDetails,
   register: InvoiceRegister,
+  receipts: PaymentReceiptsRegister,
+  receipt: ReceiptDetails,
+  ledger: PartyLedger,
   settings: Settings,
 };
 

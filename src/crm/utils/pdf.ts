@@ -8,12 +8,18 @@ function getPrintableHtml(element: HTMLElement, title: string): string {
     .map((node) => node.outerHTML)
     .join("\n");
 
+  const isLandscape =
+    element.getAttribute("data-orientation") === "landscape" ||
+    element.classList.contains("landscape") ||
+    clone.getAttribute("data-orientation") === "landscape" ||
+    clone.classList.contains("landscape");
+
   const customPrintStyles = `
     <style>
       @media print {
         @page {
-          size: A4;
-          margin: 10mm 10mm 12mm 10mm;
+          size: ${isLandscape ? "A4 landscape" : "A4"};
+          margin: ${isLandscape ? "6mm 8mm 6mm 8mm" : "10mm 10mm 12mm 10mm"};
         }
         body {
           -webkit-print-color-adjust: exact !important;

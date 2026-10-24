@@ -7,6 +7,7 @@ export const NAV = [
   { key: "dashboard", label: "Dashboard", icon: "dashboard" },
   { key: "leads", label: "Leads", icon: "leads" },
   { key: "quotations", label: "Quotations", icon: "quote" },
+  { key: "projects", label: "Running Projects", icon: "projects" },
   { key: "employees", label: "Employees", icon: "employees" },
   { key: "inventory", label: "Inventory", icon: "inventory" },
   { key: "invoices", label: "Tax Invoices", icon: "invoice" },
@@ -15,15 +16,21 @@ export const NAV = [
 
 export const SECTION_OF = {
   dashboard: "dashboard", leads: "leads", lead: "leads", quotations: "quotations", quotationForm: "quotations",
-  quotation: "quotations", employees: "employees", employee: "employees", employeeDocuments: "employees",
+  quotation: "quotations", projects: "projects", projectDetails: "projects",
+  employees: "employees", employee: "employees", employeeDocuments: "employees",
   inventory: "inventory", invoices: "invoices", project: "invoices",
-  invoiceForm: "invoices", invoice: "invoices", register: "invoices", settings: "settings",
+  invoiceForm: "invoices", invoice: "invoices", register: "invoices",
+  receipts: "invoices", receipt: "invoices", ledger: "invoices",
+  settings: "settings",
 };
 
 const CRUMB = {
   lead: "Lead Details", quotationForm: "Quotation Editor", quotation: "Quotation Details",
+  projects: "Running Projects", projectDetails: "Project Execution & Work Order",
   employee: "Employee Profile", employeeDocuments: "KYC Documents",
-  project: "Project Workspace", invoiceForm: "Invoice Editor", invoice: "Invoice Details", register: "Invoice Register",
+  project: "Project Workspace", invoiceForm: "Invoice Editor", invoice: "Invoice Details",
+  register: "Invoice Register", receipts: "Payment Receipts", receipt: "Payment Receipt Voucher",
+  ledger: "Party Ledger",
 };
 
 export function Sidebar({ open, onClose }) {
@@ -87,6 +94,9 @@ export function Topbar({ onMenu }) {
       const p = data.projects.find((x) => x.id === i.projectId);
       matches(q, i.number, p?.name, p?.customerName) && r.push({ k: i.id, type: "Invoice", label: `${i.number} · ${p?.name}`, go: () => go("invoice", { id: i.id }) });
     });
+    (data.receipts || []).forEach((rec) => {
+      matches(q, rec.number, rec.customerName, rec.invoiceNumber, rec.reference) && r.push({ k: rec.id, type: "Receipt", label: `${rec.number} · ${rec.customerName} · ${rec.invoiceNumber}`, go: () => go("receipt", { id: rec.id }) });
+    });
     data.employees.forEach((e) => matches(q, e.code, e.name, e.phone, e.email) && r.push({ k: e.id, type: "Employee", label: `${e.code} · ${e.name}`, go: () => go("employee", { id: e.id }) }));
     return r.slice(0, 12);
   }, [q, data, go]);
@@ -96,6 +106,8 @@ export function Topbar({ onMenu }) {
     ["New Quotation", () => go("quotationForm", {})],
     ["New Project", () => go("invoices", { newProject: true })],
     ["Invoice Register", () => go("register")],
+    ["Payment Receipts", () => go("invoices", { tab: "receipts" })],
+    ["Party Ledger", () => go("invoices", { tab: "ledger" })],
     ["New Inventory Item", () => go("inventory", { new: true })],
   ];
 

@@ -32,6 +32,50 @@ const inrFmt = new Intl.NumberFormat("en-IN", {
 });
 export const inr = (n) => inrFmt.format(round2(num(n)));
 
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function numToWords999(n) {
+  let s = "";
+  if (n >= 100) {
+    s += ONES[Math.floor(n / 100)] + " Hundred ";
+    n %= 100;
+  }
+  if (n >= 20) {
+    s += TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
+  } else if (n > 0) {
+    s += ONES[n];
+  }
+  return s.trim();
+}
+
+export function inrWords(amount) {
+  const v = round2(num(amount));
+  if (v === 0) return "Rupees Zero Only";
+  const intPart = Math.floor(Math.abs(v));
+  const decPart = Math.round((Math.abs(v) - intPart) * 100);
+
+  let parts = [];
+  const crore = Math.floor(intPart / 10000000);
+  let rem = intPart % 10000000;
+  const lakh = Math.floor(rem / 100000);
+  rem %= 100000;
+  const thousand = Math.floor(rem / 1000);
+  rem %= 1000;
+  const hundredAndBelow = rem;
+
+  if (crore > 0) parts.push(numToWords999(crore) + " Crore");
+  if (lakh > 0) parts.push(numToWords999(lakh) + " Lakh");
+  if (thousand > 0) parts.push(numToWords999(thousand) + " Thousand");
+  if (hundredAndBelow > 0) parts.push(numToWords999(hundredAndBelow));
+
+  let words = "Rupees " + (parts.join(" ") || "Zero");
+  if (decPart > 0) {
+    words += " and " + numToWords999(decPart) + " Paise";
+  }
+  return words + " Only";
+}
+
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export function fmtDate(iso) {
   if (!iso) return "—";

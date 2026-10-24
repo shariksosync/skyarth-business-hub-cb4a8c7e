@@ -80,8 +80,34 @@ export function Quotations() {
 
   // Compute quotation total
   const getQuoteTotal = (quote: any) => {
+    if (quote.grandTotal !== undefined && Number(quote.grandTotal) > 0) {
+      return Number(quote.grandTotal);
+    }
+    const items = quote.items || [];
+    if (items.some((i: any) => i.totalValue !== undefined || i.areaSqft !== undefined)) {
+      const totalArea = items.reduce(
+        (sum: number, it: any) => sum + (Number(it.totalAreaSqft || (it.areaSqft * (it.qty || 1))) || 0),
+        0
+      );
+      const totalVal = items.reduce(
+        (sum: number, it: any) => sum + (Number(it.totalValue || (it.areaSqft * it.rate)) || 0),
+        0
+      );
+      const install =
+        quote.installationCharges !== undefined && quote.installationCharges !== ""
+          ? Number(quote.installationCharges)
+          : Number(((quote.installationRatePerSqft || 30) * totalArea).toFixed(2));
+      const transport =
+        quote.transportCharges !== undefined && quote.transportCharges !== ""
+          ? Number(quote.transportCharges)
+          : 2500;
+      const subtotal = totalVal + install + transport;
+      const gst = subtotal * ((quote.taxRate || 18) / 100);
+      return Math.round(subtotal + gst);
+    }
+
     const totals = computeTotals(
-      (quote.items || []).map((i: any) => ({
+      items.map((i: any) => ({
         qty: Number(i.qty) || 0,
         rate: Number(i.rate) || 0,
         discount: Number(i.discount) || 0,

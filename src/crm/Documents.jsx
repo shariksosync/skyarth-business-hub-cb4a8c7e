@@ -1,4 +1,4 @@
-import { docTotals, fmtDate, inr, invoiceSummary, lineCalc } from "./utils";
+import { docTotals, fmtDate, inr, inrWords, invoiceSummary, lineCalc } from "./utils";
 import { Logo } from "./ui";
 
 function CompanyBlock({ s, title, flag }) {
@@ -133,7 +133,8 @@ export function InvoiceDocument({ inv, project, quotation, settings, employees }
       </div>
       <div className="doc-box mb-3">
         <table className="doc-kv doc-kv-wide"><tbody>
-          <tr><td>Invoice No.</td><td>{inv.number}</td><td>Invoice Date</td><td>{fmtDate(inv.date)}</td></tr>
+          <tr><td>Invoice No.</td><td className="font-bold">{inv.number}</td><td>Invoice Date</td><td>{fmtDate(inv.date)}</td></tr>
+          <tr><td>Ref Work Order No.</td><td className="font-bold font-mono">{inv.workOrderNo || project.workOrderNo || "—"}</td><td>Work Order Date</td><td>{fmtDate(inv.workOrderDate || project.workOrderDate) || "—"}</td></tr>
           <tr><td>Invoice Stage</td><td>{inv.stage}</td><td>Due Date</td><td>{fmtDate(inv.dueDate)}</td></tr>
           <tr><td>Project ID</td><td>{project.code}</td><td>Project Name</td><td>{project.name}</td></tr>
           <tr><td>Quotation No.</td><td>{quotation?.number || "—"}</td><td>Reference</td><td>{inv.reference || "—"}</td></tr>
@@ -146,20 +147,68 @@ export function InvoiceDocument({ inv, project, quotation, settings, employees }
           {inv.notes && (<><div className="doc-label">Notes</div><p>{inv.notes}</p></>)}
           <div className="doc-label mt-2">Payment Terms</div>
           <p>{settings.paymentTerms}</p>
-          {inv.payments.length > 0 && (
-            <>
-              <div className="doc-label mt-2">Payments Received</div>
-              {inv.payments.map((p) => <div key={p.id}>{fmtDate(p.date)} · {p.method} · {p.ref || "—"} · {inr(p.amount)}</div>)}
-            </>
-          )}
         </div>
-        <Totals t={s} treatment={inv.taxTreatment} extra={(
-          <>
-            <tr><td>Amount Paid</td><td className="r">{inr(s.paid)}</td></tr>
-            <tr className="font-bold"><td>Balance Due</td><td className="r">{inr(s.balance)}</td></tr>
-          </>
-        )} />
+        <Totals t={s} treatment={inv.taxTreatment} />
       </div>
+      <Signature s={settings} />
+    </div>
+  );
+}
+
+export function ReceiptDocument({ receipt, project, invoice, settings }) {
+  return (
+    <div className="print-doc doc">
+      <CompanyBlock s={settings} title="PAYMENT RECEIPT" />
+      <div className="doc-grid mb-3">
+        <div className="doc-box">
+          <div className="doc-label">Received With Thanks From</div>
+          <div className="font-bold text-base">{receipt.companyName || receipt.customerName || project?.customerName}</div>
+          {receipt.companyName && <div className="text-xs text-neutral-600">Attn: {receipt.customerName || project?.customerName}</div>}
+          {project?.billingAddress && <div>{project.billingAddress}</div>}
+          <div>Phone: {project?.phone || "—"}{project?.email ? ` · ${project.email}` : ""}</div>
+          {project?.gstin && <div>GSTIN: {project.gstin}</div>}
+        </div>
+        <div className="doc-box">
+          <table className="doc-kv"><tbody>
+            <tr><td>Receipt No.</td><td className="font-bold">{receipt.number}</td></tr>
+            <tr><td>Receipt Date</td><td>{fmtDate(receipt.date)}</td></tr>
+            <tr><td>Tax Invoice Ref</td><td className="font-semibold">{receipt.invoiceNumber || invoice?.number || "—"}</td></tr>
+            {invoice?.date && <tr><td>Invoice Date</td><td>{fmtDate(invoice.date)}</td></tr>}
+            <tr><td>Project</td><td>{project ? `${project.code} · ${project.name}` : "—"}</td></tr>
+            {invoice?.stage && <tr><td>Invoice Stage</td><td>{invoice.stage}</td></tr>}
+          </tbody></table>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-4 mb-3 bg-neutral-50/50">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-3">
+          <div>
+            <span className="text-xs font-semibold uppercase text-neutral-500">Amount Received</span>
+            <div className="text-2xl font-extrabold text-neutral-900">{inr(receipt.amount)}</div>
+          </div>
+          <div className="text-right">
+            <span className="text-xs font-semibold uppercase text-neutral-500">Payment Mode</span>
+            <div className="font-bold text-neutral-900">{receipt.method}</div>
+            {receipt.reference && <div className="text-xs font-mono text-neutral-600">Ref / UTR: {receipt.reference}</div>}
+          </div>
+        </div>
+        <div className="pt-3">
+          <span className="text-xs font-semibold uppercase text-neutral-500">Amount in Words</span>
+          <div className="font-serif italic font-medium text-neutral-900">{inrWords(receipt.amount)}</div>
+        </div>
+      </div>
+
+      <div className="doc-box mb-3">
+        <div className="doc-label">Narration / Notes</div>
+        <p className="text-sm">
+          {receipt.notes || `Received with thanks towards Tax Invoice #${receipt.invoiceNumber || invoice?.number} for ${project?.name || "project installation"}.`}
+        </p>
+      </div>
+
+      <div className="text-xs text-neutral-500 mb-4">
+        * Payment is subject to realization of cheque / electronic banking clearance. This is a computer-generated official receipt voucher.
+      </div>
+
       <Signature s={settings} />
     </div>
   );

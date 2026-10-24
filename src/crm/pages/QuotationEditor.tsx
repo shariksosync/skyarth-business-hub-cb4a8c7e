@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
+  Calculator,
+  Layers,
 } from "lucide-react";
 import { useCRM, empName } from "../store";
 import {
@@ -27,8 +29,6 @@ import {
 import {
   inr,
   dateFmt,
-  computeTotals,
-  amountInWords,
   formatQuotationNumber,
   getQuotationFileName,
   todayISO,
@@ -37,32 +37,79 @@ import { printPdfFromElement, previewPdfInNewTab } from "../utils/pdf";
 import { QuotationPrintTemplate } from "../components/QuotationPrintTemplate";
 import { QUOTATION_STATUSES } from "./Quotations";
 
-const UPVC_CATEGORIES = [
-  "uPVC Casement Windows",
-  "uPVC Sliding Windows (2-Track)",
-  "uPVC Sliding Windows (3-Track with Mesh)",
-  "uPVC Fixed Windows & Architectural Facades",
-  "uPVC French Windows & Doors",
-  "Heavy-Duty Patio Sliding Doors",
-  "Lift and Slide Premium Doors",
-  "Slide & Fold (Bi-Fold) Systems",
-  "Hardware, Multipoint Locks & Handles",
-  "Fabrication, Glazing & Site Installation",
-  "Custom uPVC Framing Solution",
+export const PRODUCT_BRANDS = [
+  "Fenstech",
+  "Skyarth Premium",
+  "Deceuninck",
+  "Prominance",
+  "Kommerling",
+  "Aluplast",
 ];
 
-const UNITS = ["Sq.ft", "Nos", "Sq.m", "Rft", "Set", "Job", "Lot"];
+export const WINDOW_COLOURS = [
+  "White",
+  "Golden Oak",
+  "Dark Oak",
+  "Walnut",
+  "Anthracite Grey",
+  "Mahogany",
+  "Custom Textured",
+];
 
-const blankItem = () => ({
-  id: `it-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-  name: "uPVC Casement Window",
-  description: "uPVC casement window with 5mm clear toughened glass, premium white multi-chamber profile & multipoint lock",
-  dimensions: "4 ft x 5 ft",
+export const MESH_TYPES = [
+  "Nylon",
+  "SS 304 Mosquito Mesh",
+  "Pleated Mesh",
+  "Fiberglass Mesh",
+  "Not Applicable",
+];
+
+export const GLASS_SPECS = [
+  "CLEAR GLASS",
+  "FROSTED GLASS",
+  "TOUGHENED CLEAR GLASS",
+  "TINTED GLASS",
+  "DGU (DOUBLE GLAZING)",
+  "LAMINATED SAFETY GLASS",
+];
+
+export const LOCKING_TYPES = [
+  "TOUCHLOCK",
+  "LOUVERS",
+  "HANDLE",
+  "CRESCENT LOCK",
+  "MULTIPOINT LOCK",
+  "POP-UP HANDLE",
+];
+
+export const DESIGN_SPECS = [
+  "3 TRACK 2 GLASS 1 MESH (99MM SECTION)",
+  "2 TRACK 2 GLASS (60MM SECTION)",
+  "3 TRACK 3 GLASS (99MM SECTION)",
+  "LOUVERS WITH EXHAUST FAN PROVISION",
+  "OPENABLE WINDOW (CASEMENT)",
+  "FIXED GLASS WINDOW (60MM SECTION)",
+  "FRENCH WINDOW WITH MULTIPOINT LOCK",
+  "SLIDE & FOLD (HEAVY SECTION)",
+  "LIFT & SLIDE PREMIUM SYSTEM",
+];
+
+const blankWindowItem = (idx = 1) => ({
+  id: `w-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  windowCode: `W${idx}`,
+  location: `BEDROOM ${idx > 1 ? idx : 1}`,
+  widthMm: 1524,
+  heightMm: 1402,
+  areaSqft: 23.12,
   qty: 1,
-  unit: "Sq.ft",
-  rate: 650,
-  discount: 0,
-  taxRate: 18,
+  totalAreaSqft: 23.12,
+  rate: 480,
+  valueEach: 11098.18,
+  totalValue: 11098.18,
+  glassThickness: "5",
+  glassSpec: "CLEAR GLASS",
+  lockingType: "TOUCHLOCK",
+  designSpecs: "3 TRACK 2 GLASS 1 MESH (99MM SECTION)",
 });
 
 export function QuotationEditor() {
@@ -75,7 +122,22 @@ export function QuotationEditor() {
     if (quote) {
       return {
         ...quote,
-        items: (quote.items || []).map((i: any) => ({ ...i })),
+        subject: quote.subject || "Delivery Of uPVC DOORS & WINDOWS",
+        productBrand: quote.productBrand || "Fenstech",
+        windowColour: quote.windowColour || "White",
+        deliveryDays: quote.deliveryDays || "Delivery with in 30 days",
+        meshType: quote.meshType || "Nylon",
+        paymentTerms: quote.paymentTerms || "Payment - 100% Advance",
+        hardwareBrand: quote.hardwareBrand || "Windseal / DNV Imported hardware",
+        installationRatePerSqft: quote.installationRatePerSqft !== undefined ? quote.installationRatePerSqft : 30,
+        installationCharges: quote.installationCharges !== undefined ? quote.installationCharges : "",
+        transportCharges: quote.transportCharges !== undefined ? quote.transportCharges : 2500,
+        taxRate: quote.taxRate !== undefined ? quote.taxRate : 18,
+        representativeName: quote.representativeName || "Mr. Swapnil Pawar",
+        representativeAddress:
+          quote.representativeAddress ||
+          "Gat NO.226, BAIF Road, Manjari Khurd, Satav wasti, Pune 412307",
+        items: (quote.items || []).map((i: any, idx: number) => normalizeItem(i, idx)),
       };
     }
     // Prefill from params if converting from a lead
@@ -87,48 +149,65 @@ export function QuotationEditor() {
       date: todayISO(),
       validUntil: todayISO(),
       leadId: p.leadId || "",
-      customerName: p.customerName || "",
-      projectName: p.projectName || "",
+      customerName: p.customerName || "Mr. Mahesh Chawla Sir",
+      projectName: p.projectName || "PUNE",
       customerCompany: p.customerCompany || "",
-      customerPhone: p.customerPhone || "",
+      customerPhone: p.customerPhone || "9822011001",
       customerEmail: p.customerEmail || "",
-      customerAddress: p.customerAddress || "",
-      siteAddress: p.siteAddress || p.customerAddress || "",
+      customerAddress: p.customerAddress || "Pune, Maharashtra",
+      siteAddress: p.siteAddress || p.customerAddress || "PUNE",
+      billingAddress: p.customerAddress || "PUNE",
       customerGstin: "",
       employeeId: p.employeeId || employees[0]?.id || "",
+      expectedCompletionDate: p.expectedCompletionDate || "",
       status: "Draft",
-      paymentTerms: "50% Advance with confirmation order, 40% on dispatch of fabricated frames, 10% on completion of installation.",
-      notes: "10 Years Warranty on uPVC profiles against fading & warping. 1 Year on moving hardware components. Civil preparation in client's scope.",
+      subject: "Delivery Of uPVC DOORS & WINDOWS",
+      productBrand: "Fenstech",
+      windowColour: "White",
+      deliveryDays: "Delivery with in 30 days",
+      meshType: "Nylon",
+      paymentTerms: "Payment - 100% Advance",
+      hardwareBrand: "Windseal / DNV Imported hardware",
+      installationRatePerSqft: 30,
+      installationCharges: "",
+      transportCharges: 2500,
+      taxRate: 18,
+      representativeName: "Mr. Swapnil Pawar",
+      representativeAddress: "Gat NO.226, BAIF Road, Manjari Khurd, Satav wasti, Pune 412307",
       items: [
         {
-          name: "uPVC Casement Windows",
-          description: "4 ft x 5 ft casement window with 5mm Saint-Gobain clear toughened glass & SS hinges",
-          dimensions: "4 ft x 5 ft (4 nos)",
-          qty: 80,
-          unit: "Sq.ft",
-          rate: 650,
-          discount: 5,
-          taxRate: 18,
-        },
-        {
-          name: "uPVC Sliding Windows (3-Track with Mesh)",
-          description: "6 ft x 5 ft 3-track sliding window with SS mosquito mesh shutter & premium rollers",
-          dimensions: "6 ft x 5 ft (3 nos)",
-          qty: 90,
-          unit: "Sq.ft",
-          rate: 580,
-          discount: 5,
-          taxRate: 18,
-        },
-        {
-          name: "Fabrication, Glazing & Site Installation",
-          description: "Full site alignment, polyurethane foam sealing, silicone weatherproofing & testing",
-          dimensions: "Site Scope",
+          id: "w-1",
+          windowCode: "W1",
+          location: "BEDROOM 1",
+          widthMm: 1524,
+          heightMm: 1402,
+          areaSqft: 23.12,
           qty: 1,
-          unit: "Job",
-          rate: 25000,
-          discount: 0,
-          taxRate: 18,
+          totalAreaSqft: 23.12,
+          rate: 480,
+          valueEach: 11098.18,
+          totalValue: 11098.18,
+          glassThickness: "5",
+          glassSpec: "CLEAR GLASS",
+          lockingType: "TOUCHLOCK",
+          designSpecs: "3 TRACK 2 GLASS 1 MESH (99MM SECTION)",
+        },
+        {
+          id: "w-2",
+          windowCode: "W2",
+          location: "WASHROOM 1",
+          widthMm: 914,
+          heightMm: 701,
+          areaSqft: 6.94,
+          qty: 1,
+          totalAreaSqft: 6.94,
+          rate: 460,
+          valueEach: 3190.73,
+          totalValue: 3190.73,
+          glassThickness: "4",
+          glassSpec: "FROSTED GLASS",
+          lockingType: "LOUVERS",
+          designSpecs: "LOUVERS WITH EXHAUST FAN PROVISION",
         },
       ],
     };
@@ -155,18 +234,54 @@ export function QuotationEditor() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  // Compute live totals
-  const totals = useMemo(() => {
-    return computeTotals(
-      (draft.items || []).map((i: any) => ({
-        qty: Number(i.qty) || 0,
-        rate: Number(i.rate) || 0,
-        discount: Number(i.discount) || 0,
-        taxRate: Number(i.taxRate || i.tax) || 18,
-      })),
-      true
+  // Financial calculations
+  const summary = useMemo(() => {
+    const items = draft.items || [];
+    const totalUnits = items.reduce((sum: number, it: any) => sum + (Number(it.qty) || 0), 0);
+    const totalAreaSqft = Number(
+      items.reduce((sum: number, it: any) => sum + (Number(it.totalAreaSqft) || 0), 0).toFixed(2)
     );
-  }, [draft.items]);
+    const totalWindowValue = Number(
+      items.reduce((sum: number, it: any) => sum + (Number(it.totalValue) || 0), 0).toFixed(2)
+    );
+    const avgRatePerSqft = totalAreaSqft > 0 ? Math.round(totalWindowValue / totalAreaSqft) : 0;
+
+    const installRate = draft.installationRatePerSqft !== undefined ? Number(draft.installationRatePerSqft) : 30;
+    const installationCharges =
+      draft.installationCharges !== undefined && draft.installationCharges !== ""
+        ? Number(draft.installationCharges)
+        : Number((installRate * totalAreaSqft).toFixed(2));
+
+    const transportCharges =
+      draft.transportCharges !== undefined && draft.transportCharges !== ""
+        ? Number(draft.transportCharges)
+        : 2500.0;
+
+    const totalProjectValue = Number((totalWindowValue + installationCharges + transportCharges).toFixed(2));
+    const gstRate = draft.taxRate !== undefined ? Number(draft.taxRate) : 18;
+    const gstAmount = Number(((totalProjectValue * gstRate) / 100).toFixed(2));
+    const grandTotal = Number((totalProjectValue + gstAmount).toFixed(2));
+
+    return {
+      totalUnits,
+      totalAreaSqft,
+      totalWindowValue,
+      avgRatePerSqft,
+      installRate,
+      installationCharges,
+      transportCharges,
+      totalProjectValue,
+      gstRate,
+      gstAmount,
+      grandTotal,
+    };
+  }, [
+    draft.items,
+    draft.installationRatePerSqft,
+    draft.installationCharges,
+    draft.transportCharges,
+    draft.taxRate,
+  ]);
 
   // Save handler
   const handleSave = () => {
@@ -174,21 +289,25 @@ export function QuotationEditor() {
       toast("Customer name is required", "error");
       return;
     }
-    const cleanPhone = String(draft.customerPhone || "").replace(/\D/g, "");
-    if (cleanPhone.length !== 10) {
-      toast("Client Mobile Number is required and must be exactly 10 digits", "error");
-      return;
-    }
+
+    const payload = {
+      ...draft,
+      value: summary.grandTotal,
+      installationCharges: summary.installationCharges,
+      totalAreaSqft: summary.totalAreaSqft,
+      totalUnits: summary.totalUnits,
+      grandTotal: summary.grandTotal,
+    };
 
     if (id) {
-      updateQuotation(id, draft);
+      updateQuotation(id, payload);
       toast("Quotation updated successfully");
     } else {
-      const created = addQuotation(draft);
+      const created = addQuotation(payload);
       toast(`Quotation ${draft.number} created successfully`);
       go("quotationForm", { id: created.id });
     }
-    setInitialDraft(JSON.parse(JSON.stringify(draft)));
+    setInitialDraft(JSON.parse(JSON.stringify(payload)));
   };
 
   const handleBack = () => {
@@ -201,21 +320,42 @@ export function QuotationEditor() {
 
   // Item row operations
   const handleAddItem = () => {
+    const nextIdx = (draft.items?.length || 0) + 1;
     setDraft({
       ...draft,
-      items: [...draft.items, blankItem()],
+      items: [...draft.items, blankWindowItem(nextIdx)],
     });
+    toast(`Added Window W${nextIdx}`);
   };
 
   const handleUpdateItem = (idx: number, patch: any) => {
     const next = [...draft.items];
-    next[idx] = { ...next[idx], ...patch };
+    const current = { ...next[idx], ...patch };
+
+    // Auto-calculate area in sqft when Width or Height in mm change
+    if (patch.widthMm !== undefined || patch.heightMm !== undefined) {
+      const w = Number(current.widthMm) || 0;
+      const h = Number(current.heightMm) || 0;
+      if (w > 0 && h > 0 && patch.areaSqft === undefined) {
+        current.areaSqft = Number(((w * h) / 92903.04).toFixed(2));
+      }
+    }
+
+    const qty = Number(current.qty) || 1;
+    const areaSqft = Number(current.areaSqft) || 0;
+    const rate = Number(current.rate) || 0;
+
+    current.totalAreaSqft = Number((areaSqft * qty).toFixed(2));
+    current.valueEach = Number((areaSqft * rate).toFixed(2));
+    current.totalValue = Number((current.totalAreaSqft * rate).toFixed(2));
+
+    next[idx] = current;
     setDraft({ ...draft, items: next });
   };
 
   const handleRemoveItem = (idx: number) => {
     if (draft.items.length <= 1) {
-      toast("Quotation must have at least one line item", "error");
+      toast("Quotation must have at least one window schedule item", "error");
       return;
     }
     const next = draft.items.filter((_: any, i: number) => i !== idx);
@@ -224,11 +364,12 @@ export function QuotationEditor() {
 
   const handleDuplicateItem = (idx: number) => {
     const item = draft.items[idx];
-    const cloned = { ...item, id: `it-${Date.now()}` };
+    const nextCode = `W${draft.items.length + 1}`;
+    const cloned = { ...item, id: `w-${Date.now()}`, windowCode: nextCode };
     const next = [...draft.items];
     next.splice(idx + 1, 0, cloned);
     setDraft({ ...draft, items: next });
-    toast("Line item duplicated");
+    toast(`Window duplicated as ${nextCode}`);
   };
 
   // Vector printing and new tab preview
@@ -236,7 +377,7 @@ export function QuotationEditor() {
     const el = printRef.current;
     if (!el) return;
     const fileName = getQuotationFileName(draft.number, draft.customerName);
-    toast("Preparing A4 print document…");
+    toast("Preparing A4 Landscape print document…");
     await printPdfFromElement(el, fileName);
   };
 
@@ -249,7 +390,7 @@ export function QuotationEditor() {
   };
 
   return (
-    <div className="space-y-4 pb-12">
+    <div className="space-y-4 pb-16">
       {/* Top Header & Action Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
@@ -265,10 +406,10 @@ export function QuotationEditor() {
             </span>
           )}
           <Button variant="outline" onClick={handlePreview}>
-            <ExternalLink className="size-4 text-blue-600" /> Preview in New Tab
+            <ExternalLink className="size-4 text-blue-600" /> Preview A4 Landscape
           </Button>
           <Button variant="outline" onClick={handlePrint}>
-            <Printer className="size-4" /> Print Document (A4)
+            <Printer className="size-4" /> Print Quotation (PDF)
           </Button>
           <Button variant="primary" onClick={handleSave}>
             <Save className="size-4" /> Save Quotation
@@ -276,15 +417,20 @@ export function QuotationEditor() {
         </div>
       </div>
 
-      {/* Main Form Information Card */}
+      {/* Main Metadata Card */}
       <Card className="p-5">
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100">
           <div>
-            <span className="font-mono text-xs font-extrabold bg-black text-white px-2 py-0.5 rounded">
-              {formatQuotationNumber(draft.number)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-extrabold bg-black text-white px-2 py-0.5 rounded">
+                {formatQuotationNumber(draft.number)}
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                Fenstech Schedule Format
+              </span>
+            </div>
             <h1 className="text-xl font-black text-neutral-900 mt-1">
-              {id ? `Edit Quotation — ${draft.number}` : "Create New Quotation"}
+              {id ? `Edit Quotation — ${draft.number}` : "Create Detailed Architectural Quotation"}
             </h1>
           </div>
           <div className="w-48">
@@ -299,7 +445,7 @@ export function QuotationEditor() {
         </div>
 
         {/* Client & Date Fields */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-4">
           <Field label="Quotation Number" required>
             <Input
               value={draft.number || ""}
@@ -320,107 +466,102 @@ export function QuotationEditor() {
               onChange={(e) => setDraft({ ...draft, validUntil: e.target.value })}
             />
           </Field>
+          <Field label="Subject Line">
+            <Input
+              value={draft.subject || "Delivery Of uPVC DOORS & WINDOWS"}
+              onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+              placeholder="e.g. Delivery Of uPVC DOORS & WINDOWS"
+            />
+          </Field>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
-          <Field label="Customer Full Name" required>
+          <Field label="Client / Customer Name" required>
             <Input
               value={draft.customerName || ""}
               onChange={(e) => setDraft({ ...draft, customerName: e.target.value })}
-              placeholder="e.g. Anand Mahindra"
+              placeholder="e.g. Mr. Mahesh Chawla Sir"
             />
           </Field>
-          <Field label="Project / Villa / Site Name">
+          <Field label="Project / City Location">
             <Input
               value={draft.projectName || ""}
               onChange={(e) => setDraft({ ...draft, projectName: e.target.value })}
-              placeholder="e.g. Mahindra Villa, Baner"
+              placeholder="e.g. PUNE / Baner Bungalow"
             />
           </Field>
-          <Field label="Company / Entity Name">
-            <Input
-              value={draft.customerCompany || ""}
-              onChange={(e) => setDraft({ ...draft, customerCompany: e.target.value })}
-              placeholder="Optional company name"
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
-          <Field label="Client Mobile (10 Digits)" required>
+          <Field label="Client Phone Number">
             <Input
               value={draft.customerPhone || ""}
               onChange={(e) => setDraft({ ...draft, customerPhone: e.target.value })}
               placeholder="e.g. 9822011001"
             />
           </Field>
-          <Field label="Client Email">
-            <Input
-              type="email"
-              value={draft.customerEmail || ""}
-              onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })}
-              placeholder="e.g. client@example.com"
-            />
-          </Field>
-          <Field label="Customer GSTIN">
-            <Input
-              value={draft.customerGstin || ""}
-              onChange={(e) => setDraft({ ...draft, customerGstin: e.target.value })}
-              placeholder="Optional GST number"
-            />
-          </Field>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
-          <Field label="Site Delivery / Installation Address">
-            <Textarea
-              value={draft.siteAddress || draft.customerAddress || ""}
+          <Field label="Site Delivery Address">
+            <Input
+              value={draft.siteAddress || ""}
               onChange={(e) => setDraft({ ...draft, siteAddress: e.target.value })}
-              placeholder="Site location where uPVC doors & windows will be installed"
+              placeholder="Delivery / Installation location address"
             />
           </Field>
-          <Field label="Billing Address">
-            <Textarea
-              value={draft.billingAddress || draft.customerAddress || ""}
-              onChange={(e) => setDraft({ ...draft, billingAddress: e.target.value })}
-              placeholder="Billing address for tax invoice records"
+          <Field label="Expected Project Completion Date">
+            <Input
+              type="date"
+              value={draft.expectedCompletionDate || ""}
+              onChange={(e) => setDraft({ ...draft, expectedCompletionDate: e.target.value })}
             />
           </Field>
         </div>
       </Card>
 
-      {/* uPVC Window Line Items Editor */}
+      {/* 14-Column Architectural Window Schedule Editor */}
       <Card className="p-5">
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
           <div>
-            <h2 className="text-base font-bold text-neutral-900">uPVC Window & Door Systems</h2>
-            <p className="text-xs text-neutral-500">
-              Specify system category, dimensions, clear/toughened glass, rates, and discounts
+            <div className="flex items-center gap-2">
+              <Layers className="size-4 text-amber-600" />
+              <h2 className="text-base font-bold text-neutral-900">
+                Window & Door Schedule (14-Column Engineering Specification)
+              </h2>
+            </div>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Input Width & Height in MM; Area (sqft), Line Total & Window Values calculate automatically.
             </p>
           </div>
           <Button size="sm" variant="primary" onClick={handleAddItem}>
-            <Plus className="size-4" /> Add System / Line Item
+            <Plus className="size-4" /> Add Window / Door
           </Button>
         </div>
 
-        <div className="divide-y divide-neutral-200 mt-3">
-          {(draft.items || []).map((item: any, idx: number) => {
-            const lineBase = (Number(item.qty) || 0) * (Number(item.rate) || 0);
-            const lineDisc = lineBase * ((Number(item.discount) || 0) / 100);
-            const lineNet = lineBase - lineDisc;
-
+        <div className="space-y-4 mt-4">
+          {(draft.items || []).map((it: any, idx: number) => {
             return (
-              <div key={idx} className="py-4 space-y-3 bg-neutral-50/40 p-3 rounded-lg mb-2 border border-neutral-200">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-xs text-neutral-600 uppercase">
-                    System #{idx + 1}
-                  </span>
+              <div
+                key={it.id || idx}
+                className="p-3.5 rounded-lg border border-neutral-300 bg-neutral-50/60 space-y-3"
+              >
+                {/* Row Header */}
+                <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-black bg-neutral-900 text-white px-2 py-0.5 rounded">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-mono font-bold text-neutral-950 text-sm">
+                      {it.windowCode || `W${idx + 1}`}
+                    </span>
+                    <span className="text-xs font-bold text-neutral-500 uppercase">
+                      · {it.location || "Window Location"}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleDuplicateItem(idx)}
-                      title="Duplicate item"
+                      title="Duplicate Window"
                     >
                       <Copy className="size-3.5" /> Duplicate
                     </Button>
@@ -429,70 +570,119 @@ export function QuotationEditor() {
                       variant="ghost"
                       onClick={() => handleRemoveItem(idx)}
                       className="text-rose-600 hover:text-rose-700"
-                      title="Delete item"
+                      title="Delete Window"
                     >
                       <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Field label="uPVC Product Category" required>
-                    <Select
-                      value={item.name || item.category || UPVC_CATEGORIES[0]}
-                      onChange={(e) => handleUpdateItem(idx, { name: e.target.value, category: e.target.value })}
-                      options={UPVC_CATEGORIES}
-                    />
-                  </Field>
-                  <Field label="Dimensions / Frame Size (e.g. 6 ft x 5 ft)">
+                {/* Dimension & Area Calculations Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                  <Field label="Window Code">
                     <Input
-                      value={item.dimensions || item.type || ""}
-                      onChange={(e) => handleUpdateItem(idx, { dimensions: e.target.value, type: e.target.value })}
-                      placeholder="e.g. 4 ft x 5 ft (4 nos)"
+                      value={it.windowCode || ""}
+                      onChange={(e) => handleUpdateItem(idx, { windowCode: e.target.value })}
+                      placeholder="e.g. W1, D1"
                     />
                   </Field>
-                  <Field label="Unit of Measurement">
-                    <Select
-                      value={item.unit || "Sq.ft"}
-                      onChange={(e) => handleUpdateItem(idx, { unit: e.target.value })}
-                      options={UNITS}
+                  <Field label="Location">
+                    <Input
+                      value={it.location || ""}
+                      onChange={(e) => handleUpdateItem(idx, { location: e.target.value })}
+                      placeholder="e.g. BEDROOM 1"
+                    />
+                  </Field>
+                  <Field label="Width in (MM)">
+                    <Input
+                      type="number"
+                      value={it.widthMm || ""}
+                      onChange={(e) => handleUpdateItem(idx, { widthMm: Number(e.target.value) })}
+                      placeholder="1524"
+                    />
+                  </Field>
+                  <Field label="Height in (MM)">
+                    <Input
+                      type="number"
+                      value={it.heightMm || ""}
+                      onChange={(e) => handleUpdateItem(idx, { heightMm: Number(e.target.value) })}
+                      placeholder="1402"
+                    />
+                  </Field>
+                  <Field label="Area (sqft)">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={it.areaSqft || ""}
+                      onChange={(e) => handleUpdateItem(idx, { areaSqft: Number(e.target.value) })}
+                      placeholder="23.12"
+                    />
+                  </Field>
+                  <Field label="Unit No. (Qty)">
+                    <Input
+                      type="number"
+                      value={it.qty || 1}
+                      onChange={(e) => handleUpdateItem(idx, { qty: Number(e.target.value) })}
                     />
                   </Field>
                 </div>
 
-                <Field label="Detailed Profile & Glass Specification">
-                  <Input
-                    value={item.description || ""}
-                    onChange={(e) => handleUpdateItem(idx, { description: e.target.value })}
-                    placeholder="e.g. Multi-chamber white uPVC profile, 5mm Saint-Gobain clear toughened glass, multipoint locking handle"
-                  />
-                </Field>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-                  <Field label="Quantity">
+                {/* Technical Specs: Glass, Locking & Design Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                  <Field label="Rate per sqft (₹)">
                     <Input
                       type="number"
-                      value={item.qty}
-                      onChange={(e) => handleUpdateItem(idx, { qty: Number(e.target.value) })}
-                    />
-                  </Field>
-                  <Field label="Rate per Unit (₹)">
-                    <Input
-                      type="number"
-                      value={item.rate}
+                      value={it.rate || 480}
                       onChange={(e) => handleUpdateItem(idx, { rate: Number(e.target.value) })}
                     />
                   </Field>
-                  <Field label="Discount (%)">
+                  <Field label="Glass Thickness (mm)">
                     <Input
-                      type="number"
-                      value={item.discount || 0}
-                      onChange={(e) => handleUpdateItem(idx, { discount: Number(e.target.value) })}
+                      value={it.glassThickness || "5"}
+                      onChange={(e) => handleUpdateItem(idx, { glassThickness: e.target.value })}
+                      placeholder="e.g. 5 or 4"
                     />
                   </Field>
-                  <div className="pb-1 text-right">
-                    <span className="block text-[11px] font-bold uppercase text-neutral-400">Line Amount</span>
-                    <span className="text-base font-black text-neutral-950">{inr(lineNet)}</span>
+                  <Field label="Glass Specs">
+                    <Select
+                      value={it.glassSpec || "CLEAR GLASS"}
+                      onChange={(e) => handleUpdateItem(idx, { glassSpec: e.target.value })}
+                      options={GLASS_SPECS}
+                    />
+                  </Field>
+                  <Field label="Locking Type">
+                    <Select
+                      value={it.lockingType || "TOUCHLOCK"}
+                      onChange={(e) => handleUpdateItem(idx, { lockingType: e.target.value })}
+                      options={LOCKING_TYPES}
+                    />
+                  </Field>
+                </div>
+
+                {/* Design Specifications & Live Calculations */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="sm:col-span-8">
+                    <Field label="Design Specifications">
+                      <Select
+                        value={it.designSpecs || DESIGN_SPECS[0]}
+                        onChange={(e) => handleUpdateItem(idx, { designSpecs: e.target.value })}
+                        options={DESIGN_SPECS}
+                      />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-4 bg-white p-2 rounded border border-neutral-200 flex justify-around items-center text-xs">
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block uppercase font-bold">Total Area</span>
+                      <span className="font-mono font-bold text-neutral-900">{Number(it.totalAreaSqft).toFixed(2)} sqft</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block uppercase font-bold">Value Each</span>
+                      <span className="font-mono font-bold text-neutral-900">{inr(Number(it.valueEach))}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block uppercase font-bold">Total Line Value</span>
+                      <span className="font-mono font-black text-neutral-950">{inr(Number(it.totalValue))}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -500,100 +690,195 @@ export function QuotationEditor() {
           })}
         </div>
 
-        <Button size="sm" variant="outline" onClick={handleAddItem} className="mt-3">
-          <Plus className="size-4" /> Add Another Line Item
+        <Button size="sm" variant="outline" onClick={handleAddItem} className="mt-4">
+          <Plus className="size-4" /> Add Another Window to Schedule
         </Button>
       </Card>
 
-      {/* Commercial Terms & Financial Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <div className="lg:col-span-2 space-y-4">
+      {/* Technical Specifications & Commercial Terms */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left Side: Technical Options & Notes */}
+        <div className="lg:col-span-7 space-y-4">
           <Card className="p-4 space-y-3">
             <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-2">
-              Commercial Terms & Warranties
+              Technical Specifications & Commercial Terms (PDF Box 1)
             </h3>
-            <Field label="Payment Milestones & Commercial Terms">
-              <Textarea
-                value={draft.paymentTerms || ""}
-                onChange={(e) => setDraft({ ...draft, paymentTerms: e.target.value })}
-                rows={3}
-              />
-            </Field>
-            <Field label="Warranty, Civil Exclusions & Special Notes">
-              <Textarea
-                value={draft.notes || ""}
-                onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                rows={3}
-              />
-            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Product Profile Brand">
+                <Select
+                  value={draft.productBrand || "Fenstech"}
+                  onChange={(e) => setDraft({ ...draft, productBrand: e.target.value })}
+                  options={PRODUCT_BRANDS}
+                />
+              </Field>
+              <Field label="Window Colour">
+                <Select
+                  value={draft.windowColour || "White"}
+                  onChange={(e) => setDraft({ ...draft, windowColour: e.target.value })}
+                  options={WINDOW_COLOURS}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Delivery Schedule">
+                <Input
+                  value={draft.deliveryDays || "Delivery with in 30 days"}
+                  onChange={(e) => setDraft({ ...draft, deliveryDays: e.target.value })}
+                  placeholder="e.g. Delivery with in 30 days"
+                />
+              </Field>
+              <Field label="Mesh Type">
+                <Select
+                  value={draft.meshType || "Nylon"}
+                  onChange={(e) => setDraft({ ...draft, meshType: e.target.value })}
+                  options={MESH_TYPES}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Payment Terms">
+                <Input
+                  value={draft.paymentTerms || "Payment - 100% Advance"}
+                  onChange={(e) => setDraft({ ...draft, paymentTerms: e.target.value })}
+                  placeholder="e.g. Payment - 100% Advance"
+                />
+              </Field>
+              <Field label="Hardware Specification">
+                <Input
+                  value={draft.hardwareBrand || "Windseal / DNV Imported hardware"}
+                  onChange={(e) => setDraft({ ...draft, hardwareBrand: e.target.value })}
+                  placeholder="e.g. Windseal / DNV Imported hardware"
+                />
+              </Field>
+            </div>
+          </Card>
+
+          {/* Representative & Address Box */}
+          <Card className="p-4 space-y-3">
+            <h3 className="font-bold text-sm text-neutral-900 border-b border-neutral-100 pb-2">
+              Representative & Dispatch Office (PDF Box 3)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Company Representative Name">
+                <Input
+                  value={draft.representativeName || "Mr. Swapnil Pawar"}
+                  onChange={(e) => setDraft({ ...draft, representativeName: e.target.value })}
+                />
+              </Field>
+              <Field label="Office / Factory Address">
+                <Input
+                  value={
+                    draft.representativeAddress ||
+                    "Gat NO.226, BAIF Road, Manjari Khurd, Satav wasti, Pune 412307"
+                  }
+                  onChange={(e) => setDraft({ ...draft, representativeAddress: e.target.value })}
+                />
+              </Field>
+            </div>
           </Card>
         </div>
 
-        <div>
-          <Card className="p-5 space-y-3 border-neutral-300">
-            <h3 className="font-extrabold text-sm uppercase tracking-wider text-neutral-900 border-b border-neutral-100 pb-2">
-              Financial Summary
-            </h3>
+        {/* Right Side: Financial Calculation Summary (PDF Box 2) */}
+        <div className="lg:col-span-5 space-y-4">
+          <Card className="p-4 space-y-3 border-neutral-400 shadow-sm">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+              <h3 className="font-black text-sm uppercase tracking-wide text-neutral-900">
+                Summary Calculation
+              </h3>
+              <span className="text-xs font-bold font-mono text-neutral-500">
+                {summary.totalUnits} Units · {summary.totalAreaSqft} Sq.ft
+              </span>
+            </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-neutral-600">
-                <span>Subtotal (Gross):</span>
-                <span className="font-semibold text-neutral-900">{inr(totals.subtotal)}</span>
+            {/* Configurable charges */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <Field label="Installation Rate (₹ / sqft)">
+                <Input
+                  type="number"
+                  value={draft.installationRatePerSqft !== undefined ? draft.installationRatePerSqft : 30}
+                  onChange={(e) =>
+                    setDraft({ ...draft, installationRatePerSqft: Number(e.target.value) })
+                  }
+                />
+              </Field>
+              <Field label="Transport Charges (₹)">
+                <Input
+                  type="number"
+                  value={draft.transportCharges !== undefined ? draft.transportCharges : 2500}
+                  onChange={(e) => setDraft({ ...draft, transportCharges: Number(e.target.value) })}
+                />
+              </Field>
+            </div>
+
+            {/* Financial Breakdown Table */}
+            <div className="divide-y divide-neutral-200 border border-neutral-300 rounded text-xs overflow-hidden mt-2">
+              <div className="flex justify-between p-2 bg-neutral-50 font-semibold">
+                <span>Total No. Of Windows / Doors</span>
+                <span className="font-bold">{summary.totalUnits}</span>
               </div>
-              {totals.totalDiscount > 0 && (
-                <div className="flex justify-between text-rose-600">
-                  <span>Total Discount:</span>
-                  <span className="font-semibold">- {inr(totals.totalDiscount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-neutral-900 bg-neutral-50 p-1.5 rounded">
-                <span>Taxable Value:</span>
-                <span>{inr(totals.taxable)}</span>
+              <div className="flex justify-between p-2">
+                <span className="text-neutral-700">Total Window Value (Base)</span>
+                <span className="font-mono font-bold text-neutral-900">
+                  {inr(summary.totalWindowValue)}
+                </span>
               </div>
-              <div className="flex justify-between text-neutral-600">
-                <span>CGST (9%):</span>
-                <span className="font-medium text-neutral-900">{inr(totals.cgst)}</span>
+              <div className="flex justify-between p-2">
+                <span className="text-neutral-700">Average Rate per Sqft</span>
+                <span className="font-mono font-bold text-neutral-900">
+                  ₹{summary.avgRatePerSqft} / sqft
+                </span>
               </div>
-              <div className="flex justify-between text-neutral-600">
-                <span>SGST (9%):</span>
-                <span className="font-medium text-neutral-900">{inr(totals.sgst)}</span>
+              <div className="flex justify-between p-2">
+                <span className="text-neutral-700">
+                  Installation Charges (₹{summary.installRate} × {summary.totalAreaSqft} sqft)
+                </span>
+                <span className="font-mono font-semibold text-neutral-900">
+                  {inr(summary.installationCharges)}
+                </span>
               </div>
-              {totals.roundOff !== 0 && (
-                <div className="flex justify-between text-neutral-400 text-[11px]">
-                  <span>Round off:</span>
-                  <span>{totals.roundOff > 0 ? `+${totals.roundOff}` : totals.roundOff}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-black text-white bg-black p-3 rounded-lg mt-3">
-                <span>Grand Total:</span>
-                <span>{inr(totals.total)}</span>
+              <div className="flex justify-between p-2">
+                <span className="text-neutral-700">Transport & Handling</span>
+                <span className="font-mono font-semibold text-neutral-900">
+                  {inr(summary.transportCharges)}
+                </span>
+              </div>
+              <div className="flex justify-between p-2 bg-neutral-100 font-bold border-t border-neutral-300">
+                <span>Total Project Value</span>
+                <span className="font-mono">{inr(summary.totalProjectValue)}</span>
+              </div>
+              <div className="flex justify-between p-2">
+                <span className="text-neutral-700">GST 18%</span>
+                <span className="font-mono font-semibold text-neutral-900">
+                  {inr(summary.gstAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between p-2.5 bg-neutral-950 text-white font-extrabold text-sm">
+                <span>Grand Total (INR)</span>
+                <span className="font-mono">{inr(summary.grandTotal)}</span>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-neutral-100">
-              <p className="text-[10.5px] font-bold uppercase text-neutral-500">Amount in Words:</p>
-              <p className="text-xs font-extrabold text-neutral-900 mt-0.5 leading-snug">
-                {amountInWords(totals.total)}
-              </p>
-            </div>
-
-            <Button variant="primary" onClick={handleSave} className="w-full mt-3">
+            <Button variant="primary" className="w-full mt-3 font-bold" onClick={handleSave}>
               <Save className="size-4" /> Save Quotation
             </Button>
           </Card>
         </div>
       </div>
 
-      {/* Hidden container for print template */}
-      <div style={{ position: "fixed", left: -9999, top: -9999, width: 840 }}>
-        <QuotationPrintTemplate ref={printRef} quotation={{ ...draft, ...totals }} />
+      {/* Hidden Vector Print Template for PDF Export */}
+      <div className="hidden">
+        <QuotationPrintTemplate ref={printRef} quotation={draft} />
       </div>
 
       {/* Unsaved Changes Confirmation Modal */}
       <ConfirmDialog
         open={showExitModal}
-        title="Discard Unsaved Changes?"
-        message="You have unsaved changes in this quotation. Are you sure you want to leave without saving?"
+        title="Unsaved Changes"
+        message="You have unsaved changes in this quotation. Are you sure you want to leave?"
+        confirmLabel="Discard & Leave"
+        variant="danger"
         onCancel={() => setShowExitModal(false)}
         onConfirm={() => {
           setShowExitModal(false);
@@ -602,4 +887,45 @@ export function QuotationEditor() {
       />
     </div>
   );
+}
+
+function normalizeItem(i: any, idx: number) {
+  const widthMm = Number(i.widthMm) || (i.dimensions ? parseDim(i.dimensions, "w") : 1524);
+  const heightMm = Number(i.heightMm) || (i.dimensions ? parseDim(i.dimensions, "h") : 1402);
+  const qty = Number(i.qty) || 1;
+  const rate = Number(i.rate) || 480;
+  const computedArea = Number(((widthMm * heightMm) / 92903.04).toFixed(2));
+  const areaSqft = i.areaSqft !== undefined ? Number(i.areaSqft) : computedArea;
+  const totalAreaSqft = i.totalAreaSqft !== undefined ? Number(i.totalAreaSqft) : Number((areaSqft * qty).toFixed(2));
+  const valueEach = i.valueEach !== undefined ? Number(i.valueEach) : Number((areaSqft * rate).toFixed(2));
+  const totalValue = i.totalValue !== undefined ? Number(i.totalValue) : Number((totalAreaSqft * rate).toFixed(2));
+
+  return {
+    ...i,
+    id: i.id || `it-${idx}`,
+    windowCode: i.windowCode || `W${idx + 1}`,
+    location: i.location || i.name || "WINDOW",
+    widthMm,
+    heightMm,
+    areaSqft,
+    qty,
+    totalAreaSqft,
+    rate,
+    valueEach,
+    totalValue,
+    glassThickness: i.glassThickness || "5",
+    glassSpec: i.glassSpec || "CLEAR GLASS",
+    lockingType: i.lockingType || "TOUCHLOCK",
+    designSpecs: i.designSpecs || i.description || "3 TRACK 2 GLASS 1 MESH (99MM SECTION)",
+  };
+}
+
+function parseDim(dim: string, axis: "w" | "h"): number {
+  if (!dim) return 1200;
+  const match = dim.match(/(\d+)\s*(?:x|X|\*)\s*(\d+)/);
+  if (match) {
+    const val = axis === "w" ? match[1] : match[2];
+    return Number(val) || 1200;
+  }
+  return 1200;
 }

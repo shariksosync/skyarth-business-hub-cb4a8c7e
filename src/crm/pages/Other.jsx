@@ -24,7 +24,7 @@ export function Dashboard() {
         <StatCard label="Active Leads" value={active} onClick={() => go("leads", { status: "active" })} />
         <StatCard label="Total Quotations" value={Q.length} onClick={() => go("quotations")} />
         <StatCard label="Pending Quotations" value={pendQ} onClick={() => go("quotations", { status: "Pending" })} />
-        <StatCard label="Total Projects" value={data.projects.length} onClick={() => go("invoices")} />
+        <StatCard label="Total Projects" value={data.projects.length} onClick={() => go("projects")} />
         <StatCard label="Total Tax Invoices" value={data.invoices.length} onClick={() => go("register")} />
         <StatCard label="Pending Payments" value={inr(pending)} onClick={() => go("register", { status: "Pending" })} />
         <StatCard label="Total Employees" value={data.employees.length} onClick={() => go("employees")} />
@@ -63,115 +63,8 @@ export function Dashboard() {
   );
 }
 
-/* ---------------- Inventory ---------------- */
-export function Inventory() {
-  const { data, update, toast, route } = useCRM();
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState("");
-  const [st, setSt] = useState("");
-  const [form, setForm] = useState(route.params.new ? {} : null);
-  const [view, setView] = useState(null);
-  const [mv, setMv] = useState(null);
-  const [del, setDel] = useState(null);
-  const [err, setErr] = useState({});
-  const rows = data.inventory.map((i) => ({ ...i, avail: stockAvailable(i), status: stockStatus(i) })).filter((i) => matches(q, i.code, i.name, i.description) && (!cat || i.category === cat) && (!st || i.status === st));
-  const low = data.inventory.filter((i) => stockStatus(i) !== "In Stock").length;
-  const openForm = (it) => { setErr({}); setForm(it?.id ? { ...it } : { code: "", name: "", category: INVENTORY_CATEGORIES[0], description: "", unit: "Nos", stock: 0, reserved: 0, purchaseRate: 0, sellingRate: 0, reorderLevel: 0 }); };
-  if (form && !("code" in form)) openForm();
-  const saveItem = () => {
-    const e = {};
-    if (!form.code?.trim()) e.code = "Required"; else if (data.inventory.some((x) => x.id !== form.id && x.code.toLowerCase() === form.code.trim().toLowerCase())) e.code = "Item code already exists";
-    if (!form.name?.trim()) e.name = "Required";
-    ["stock", "reserved", "purchaseRate", "sellingRate", "reorderLevel"].forEach((k) => { if (num(form[k]) < 0) e[k] = "Cannot be negative"; });
-    if (num(form.reserved) > num(form.stock)) e.reserved = "Reserved cannot exceed stock";
-    setErr(e); if (Object.keys(e).length) return;
-    const rec = { ...form, code: form.code.trim(), stock: num(form.stock), reserved: num(form.reserved), purchaseRate: num(form.purchaseRate), sellingRate: num(form.sellingRate), reorderLevel: num(form.reorderLevel) };
-    if (form.id) update("inventory", (xs) => xs.map((x) => (x.id === form.id ? rec : x)));
-    else { rec.id = uid("item"); update("inventory", (xs) => [...xs, rec]); if (rec.stock > 0) update("movements", (m) => [...m, { id: uid("mv"), itemId: rec.id, date: todayISO(), type: "Received", qty: rec.stock, projectId: "", reference: "Opening", notes: "Opening stock", balanceAfter: rec.stock }]); }
-    toast(form.id ? "Item updated" : "Item added"); setForm(null);
-  };
-  const saveMove = () => {
-    const it = data.inventory.find((x) => x.id === mv.itemId);
-    const qn = num(mv.qty), e = {};
-    if (mv.type !== "Adjustment" && !(qn > 0)) e.qty = "Quantity must be greater than 0";
-    if (mv.type === "Adjustment" && qn === 0) e.qty = "Adjustment cannot be 0";
-    let stock = it.stock, reserved = it.reserved;
-    if (mv.type === "Received") stock += qn;
-    if (mv.type === "Issued") { if (qn > stock) e.qty = `Only ${stock} ${it.unit} in stock`; stock -= qn; reserved = Math.max(0, reserved - (mv.projectId ? Math.min(qn, reserved) : 0)); }
-    if (mv.type === "Adjustment") { stock += qn; if (stock < 0) e.qty = "Adjustment would make stock negative"; }
-    if (mv.type === "Reserved") { if (qn > stockAvailable(it)) e.qty = `Only ${stockAvailable(it)} available to reserve`; reserved += qn; }
-    if (reserved > stock) reserved = stock;
-    setErr(e); if (Object.keys(e).length) return;
-    update("inventory", (xs) => xs.map((x) => (x.id === it.id ? { ...x, stock: round2(stock), reserved: round2(reserved) } : x)));
-    update("movements", (m) => [...m, { id: uid("mv"), itemId: it.id, date: mv.date, type: mv.type, qty: qn, projectId: mv.projectId, reference: mv.reference, notes: mv.notes, balanceAfter: round2(stock) }]);
-    toast(`Stock ${mv.type.toLowerCase()} recorded for ${it.code}`); setMv(null);
-  };
-  const vi = data.inventory.find((x) => x.id === view);
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  return (
-    <div>
-      <PageHeader title="Inventory" subtitle={`${data.inventory.length} items · ${low} low or out of stock`}>
-        <button className="btn btn-primary" onClick={() => openForm()}><Icon name="plus" size={16} /> Add Item</button>
-      </PageHeader>
-      <Toolbar>
-        <SearchBox value={q} onChange={setQ} placeholder="Search code, name, description…" />
-        <Field label="Category"><Select value={cat} onChange={(e) => setCat(e.target.value)} placeholder="All" options={INVENTORY_CATEGORIES} /></Field>
-        <Field label="Stock status"><Select value={st} onChange={(e) => setSt(e.target.value)} placeholder="All" options={["In Stock", "Low Stock", "Out of Stock"]} /></Field>
-      </Toolbar>
-      <DataTable rows={rows} onRowClick={(r) => setView(r.id)} columns={[
-        { key: "code", label: "Code" }, { key: "name", label: "Item", render: (r) => <span className="font-semibold">{r.name}</span> }, { key: "category", label: "Category" }, { key: "description", label: "Description" },
-        { key: "unit", label: "Unit" }, { key: "stock", label: "Stock", align: "right" }, { key: "reserved", label: "Reserved", align: "right" }, { key: "avail", label: "Available", align: "right" },
-        { key: "purchaseRate", label: "Purchase", align: "right", render: (r) => inr(r.purchaseRate) }, { key: "sellingRate", label: "Selling", align: "right", render: (r) => inr(r.sellingRate) },
-        { key: "reorderLevel", label: "Reorder", align: "right" }, { key: "status", label: "Status", render: (r) => <Pill>{r.status === "In Stock" ? r.status : `⚠ ${r.status}`}</Pill> },
-        { key: "actions", label: "Actions", sortable: false, render: (r) => <div className="flex gap-1">
-          <button className="btn btn-sm" onClick={() => { setErr({}); setMv({ itemId: r.id, type: "Received", qty: "", date: todayISO(), projectId: "", reference: "", notes: "" }); }}>Stock</button>
-          <button className="btn btn-sm" onClick={() => openForm(data.inventory.find((x) => x.id === r.id))}>Edit</button>
-          <button className="btn btn-sm" onClick={() => setDel(r)}>Delete</button></div> },
-      ]} />
-      {form && "code" in form && (
-        <Modal open title={form.id ? `Edit ${form.code}` : "Add inventory item"} onClose={() => setForm(null)} footer={<><button className="btn" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary" onClick={saveItem}>Save</button></>}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Item code" required error={err.code}><Input value={form.code} onChange={set("code")} /></Field>
-            <Field label="Item name" required error={err.name}><Input value={form.name} onChange={set("name")} /></Field>
-            <Field label="Category"><Select value={form.category} onChange={set("category")} options={INVENTORY_CATEGORIES} /></Field>
-            <Field label="Unit"><Input list="inv-units" value={form.unit} onChange={set("unit")} /><datalist id="inv-units">{UNITS.map((u) => <option key={u} value={u} />)}</datalist></Field>
-            <Field label="Description" className="sm:col-span-2"><Input value={form.description} onChange={set("description")} /></Field>
-            {!form.id && <Field label="Opening stock" error={err.stock}><Input type="number" min="0" value={form.stock} onChange={set("stock")} /></Field>}
-            <Field label="Reserved" error={err.reserved}><Input type="number" min="0" value={form.reserved} onChange={set("reserved")} /></Field>
-            <Field label="Purchase rate (₹)" error={err.purchaseRate}><Input type="number" min="0" value={form.purchaseRate} onChange={set("purchaseRate")} /></Field>
-            <Field label="Selling rate (₹)" error={err.sellingRate}><Input type="number" min="0" value={form.sellingRate} onChange={set("sellingRate")} /></Field>
-            <Field label="Reorder level" error={err.reorderLevel}><Input type="number" min="0" value={form.reorderLevel} onChange={set("reorderLevel")} /></Field>
-          </div>
-          {form.id && <p className="mt-3 text-xs">To change stock quantity, use the Stock action so the change is recorded in history.</p>}
-        </Modal>
-      )}
-      {mv && (
-        <Modal open title={`Stock movement · ${data.inventory.find((x) => x.id === mv.itemId)?.code}`} onClose={() => setMv(null)} footer={<><button className="btn" onClick={() => setMv(null)}>Cancel</button><button className="btn btn-primary" onClick={saveMove}>Record</button></>}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Type"><Select value={mv.type} onChange={(e) => setMv({ ...mv, type: e.target.value })} options={["Received", "Issued", "Adjustment", "Reserved"]} /></Field>
-            <Field label={mv.type === "Adjustment" ? "Quantity (+/-)" : "Quantity"} error={err.qty}><Input type="number" value={mv.qty} onChange={(e) => setMv({ ...mv, qty: e.target.value })} /></Field>
-            <Field label="Date"><Input type="date" value={mv.date} onChange={(e) => setMv({ ...mv, date: e.target.value })} /></Field>
-            <Field label="Project (optional)"><Select value={mv.projectId} onChange={(e) => setMv({ ...mv, projectId: e.target.value })} placeholder="—" options={data.projects.map((p) => ({ value: p.id, label: `${p.code} · ${p.name}` }))} /></Field>
-            <Field label="Reference"><Input value={mv.reference} onChange={(e) => setMv({ ...mv, reference: e.target.value })} /></Field>
-            <Field label="Notes"><Input value={mv.notes} onChange={(e) => setMv({ ...mv, notes: e.target.value })} /></Field>
-          </div>
-        </Modal>
-      )}
-      {vi && (
-        <Modal open wide title={`${vi.code} · ${vi.name}`} onClose={() => setView(null)}>
-          <KV items={[["Category", vi.category], ["Unit", vi.unit], ["Description", vi.description], ["Stock", vi.stock], ["Reserved", vi.reserved], ["Available", stockAvailable(vi)], ["Purchase rate", inr(vi.purchaseRate)], ["Selling rate", inr(vi.sellingRate)], ["Status", stockStatus(vi)]]} />
-          <h3 className="mt-4 mb-2 font-semibold">Stock movement history</h3>
-          <DataTable compact rows={data.movements.filter((m) => m.itemId === vi.id)} empty="No movements yet." initialSort={{ key: "date", dir: "desc" }} columns={[
-            { key: "date", label: "Date", render: (r) => fmtDate(r.date) }, { key: "type", label: "Type" }, { key: "qty", label: "Qty", align: "right" },
-            { key: "projectId", label: "Project", render: (r) => data.projects.find((p) => p.id === r.projectId)?.code || "—" }, { key: "reference", label: "Ref" }, { key: "notes", label: "Notes" }, { key: "balanceAfter", label: "Stock after", align: "right" }]} />
-        </Modal>
-      )}
-      <ConfirmDialog open={!!del} title="Delete item?" confirmLabel="Delete" onCancel={() => setDel(null)} disabled={del && num(del.reserved) > 0}
-        message={del && num(del.reserved) > 0 ? "This item has reserved stock and cannot be deleted." : `Delete ${del?.code} · ${del?.name}? Its history will also be removed.`}
-        onConfirm={() => { update("inventory", (xs) => xs.filter((x) => x.id !== del.id)); update("movements", (m) => m.filter((x) => x.itemId !== del.id)); toast("Item deleted"); setDel(null); }} />
-    </div>
-  );
-}
+/* ---------------- Inventory (Re-exported from dedicated module) ---------------- */
+export { Inventory } from "./Inventory";
 
 /* ---------------- Settings ---------------- */
 export function Settings() {
@@ -241,6 +134,36 @@ export function Settings() {
           <Field label="Default quotation terms" className="sm:col-span-2 lg:col-span-3"><Textarea value={f.quotationTerms} onChange={set("quotationTerms")} /></Field>
         </div>
       </Section>
+      <Section title="WhatsApp Cloud API & Communications Gateway">
+        <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-bold text-sm text-neutral-900">Current Mode: Browser Direct 1-Click WhatsApp (wa.me)</div>
+              <div className="text-xs text-emerald-700 font-semibold mt-0.5">● Active & Operational (Zero API fees, instant delivery)</div>
+            </div>
+            <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full border border-emerald-300">Live</span>
+          </div>
+          <p className="text-xs text-neutral-600">
+            Direct 1-Click WhatsApp enables launching WhatsApp Web on desktop or the mobile app with pre-formatted milestone updates with no external backend server required.
+          </p>
+          <div className="border-t border-neutral-200 pt-3">
+            <div className="text-xs font-bold text-neutral-800 mb-2">Enterprise Meta Cloud API Gateway (Optional for Full Headless Backend):</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Meta WABA ID (WhatsApp Business Account ID)">
+                <Input placeholder="e.g. 1098234872348" value={f.metaWabaId || ""} onChange={set("metaWabaId")} />
+              </Field>
+              <Field label="Phone Number ID">
+                <Input placeholder="e.g. 1029384756102" value={f.metaPhoneId || ""} onChange={set("metaPhoneId")} />
+              </Field>
+              <Field label="Permanent System User Token" className="sm:col-span-2">
+                <Input type="password" placeholder="EAABw..." value={f.metaToken || ""} onChange={set("metaToken")} />
+              </Field>
+            </div>
+            <p className="text-[11px] text-neutral-400 mt-1">When Meta API credentials are provided and a backend is connected, automated background server webhooks can trigger directly to WhatsApp Graph API.</p>
+          </div>
+        </div>
+      </Section>
+
       <Section title="Demo data"><button className="btn" onClick={() => setReset(true)}>Reset all demo data</button></Section>
       <ConfirmDialog open={reset} title="Reset demo data?" confirmLabel="Reset" onCancel={() => setReset(false)} onConfirm={() => { resetData(); setReset(false); toast("Demo data reset"); }}
         message="All changes made in this session will be lost." />

@@ -108,7 +108,7 @@ export function Leads() {
     return leads.filter((l: any) => {
       const matchQ =
         !q ||
-        [l.code, l.customerName, l.companyName, l.phone, l.email, l.projectName, l.requirements, l.service]
+        [l.code, l.customerName, l.companyName, l.phone, l.email, l.projectName, l.requirements, l.service, l.expectedCompletionDate]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q.toLowerCase()));
       const matchStatus = !status || l.status === status;
@@ -187,6 +187,7 @@ export function Leads() {
       customerAddress: lead.billingAddress || lead.siteAddress || "",
       projectName: lead.projectName || `${lead.customerName} uPVC Project`,
       employeeId: lead.employeeId || employees[0]?.id || "",
+      expectedCompletionDate: lead.expectedCompletionDate || "",
     });
   };
 
@@ -320,6 +321,23 @@ export function Leads() {
       ),
     },
     {
+      key: "expectedCompletionDate",
+      header: "Exp. Completion",
+      sortValue: (r) => r.expectedCompletionDate || "",
+      render: (r) => (
+        <div className="text-xs font-medium">
+          {r.expectedCompletionDate ? (
+            <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-neutral-100 text-neutral-800 px-1.5 py-0.5 rounded border border-neutral-200">
+              <Calendar className="size-3 text-neutral-500" />
+              {dateFmt(r.expectedCompletionDate)}
+            </span>
+          ) : (
+            <span className="text-neutral-400">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
       key: "actions",
       header: "Actions",
       className: "text-right",
@@ -409,6 +427,7 @@ export function Leads() {
                 priority: "Medium",
                 status: "New",
                 followUpDate: todayISO(),
+                expectedCompletionDate: "",
                 employeeId: employees[0]?.id || "",
               })
             }
@@ -582,12 +601,19 @@ export function Leads() {
               </Field>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field label="Next Follow-up Date">
                 <Input
                   type="date"
                   value={form.followUpDate || ""}
                   onChange={(e) => setForm({ ...form, followUpDate: e.target.value })}
+                />
+              </Field>
+              <Field label="Expected Project Completion Date">
+                <Input
+                  type="date"
+                  value={form.expectedCompletionDate || ""}
+                  onChange={(e) => setForm({ ...form, expectedCompletionDate: e.target.value })}
                 />
               </Field>
               <Field label="Assigned Sales Representative">
